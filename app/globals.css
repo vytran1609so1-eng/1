@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter";
+  --font-display: "Instrument Serif";
+  --font-script: "Ephesis";
+}
+
+@layer base {
+  html {
+    /**
+     * NOT `scroll-behavior: smooth`.
+     *
+     * The smooth scrolling on this site is done by Lenis, which sets a new
+     * scroll position on every animation frame. If CSS *also* animates every
+     * scroll change, the two fight each other: Lenis races ahead internally
+     * while the page crawls along behind it, and the site feels as if it has
+     * seized up no matter how hard you scroll. The browser must move instantly
+     * and let Lenis do the easing.
+     */
+    scroll-behavior: auto;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-navy font-sans antialiased;
+  }
+
+  ::selection {
+    background: #16365f;
+    color: #fcfdff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f0f6fd;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #c2daf3;
+    border-radius: 99px;
+    border: 3px solid #f0f6fd;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3b82f6;
+  }
+}
+
+@layer components {
+  .wrap {
+    @apply mx-auto w-full max-w-page px-6 md:px-10;
+  }
+
+  /* Big serif display — used for keywords and section titles */
+  .display {
+    @apply font-display font-normal leading-[0.95] tracking-[-0.015em];
+  }
+
+  /* Curvy italic variant for the three keywords */
+  .display-italic {
+    @apply font-display italic font-normal leading-[0.95] tracking-[-0.01em];
+  }
+
+  /* Handwritten signature — the name */
+  .signature {
+    font-family: var(--font-script), "Great Vibes", "Brush Script MT", cursive;
+    font-weight: 400;
+    line-height: 1.08;
+    letter-spacing: 0.005em;
+  }
+
+  .eyebrow {
+    @apply text-[10px] md:text-[11px] font-semibold uppercase tracking-[0.28em];
+  }
+
+  .link-underline {
+    @apply relative inline-block;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .link-underline:hover {
+    background-size: 100% 1px;
+  }
+
+  /* Soft blue glow used behind hero + section headers */
+  .glow {
+    background: radial-gradient(
+      closest-side,
+      rgba(59, 130, 246, 0.18),
+      rgba(59, 130, 246, 0)
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Image edit mode */
+.edit-on [data-image-slot] {
+  outline: 2px dashed rgba(29, 99, 210, 0.9);
+  outline-offset: -2px;
+  cursor: grab;
+}
+.edit-on [data-image-slot]:hover {
+  outline-color: #16365f;
+}
+.edit-on [data-image-slot].is-dragging {
+  cursor: grabbing;
+}
+
+/* ---------------------------------------------------------------------------
+   Lenis (smooth scrolling)
+   `overflow-x: hidden` lives here, on the scrolling element itself — on <body>
+   it turns the body into its own scroll container and Lenis then measures the
+   wrong thing.
+--------------------------------------------------------------------------- */
+html {
+  overflow-x: hidden;
+}
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+/* Lock scrolling while a modal is open — on the scrolling element itself,
+   so it works whether or not smooth scrolling is switched on. */
+html.modal-open,
+body.modal-open {
+  overflow: hidden;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  border-radius: 99px;
+  background: #d6e6f7;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #16365f;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #16365f;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+}
