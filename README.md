@@ -232,6 +232,9 @@ Dòng thời gian ở trang `/about`. Mỗi mốc gồm **năm**, **tiêu đề*
 Năm chỉ hiện khi đổi, nên nhiều mốc cùng năm đọc như một chương. Nút **↑ ↓** đổi thứ tự — thường
 là mới nhất lên đầu. Nhớ bấm **Save changes** ở cuối trang.
 
+Mỗi ảnh có một ô **chú thích** ngay dưới hình trong admin. Chú thích hiện dưới ảnh trên trang, và
+hiện lại lần nữa khi người xem bấm vào ảnh để xem toàn màn hình. Bỏ trống thì không hiện gì.
+
 ### Blog
 
 Toàn bộ phần này bằng tiếng Việt vì bài viết bằng tiếng Việt.
@@ -246,7 +249,8 @@ Toàn bộ phần này bằng tiếng Việt vì bài viết bằng tiếng Vi�
 | **Bài nổi bật** | Bài được đưa lên đầu trang blog, khổ lớn. Chỉ nên có một |
 | **Tóm tắt** | 2–3 dòng, hiện ở danh sách và ngay dưới tiêu đề trong bài |
 | **Ảnh bìa** | Ảnh đại diện ngoài danh sách, có ba thanh trượt căn khung |
-| **Nội dung bài** | Gõ theo cú pháp trong khung *Cách gõ để chữ có định dạng*. Nút **Chèn ảnh vào bài** upload ảnh và chèn thẳng vào chỗ con trỏ |
+| **Chú thích ảnh bìa** | Dòng chữ nhỏ in dưới ảnh bìa trong bài |
+| **Nội dung bài** | Gõ theo cú pháp trong khung *Cách gõ để chữ có định dạng*. Điền ô **Chú thích cho ảnh sắp chèn** rồi bấm **Chèn ảnh vào bài** — ảnh được upload, chèn vào chỗ con trỏ kèm chú thích. Sửa chú thích sau bằng cách sửa chữ trong ngoặc vuông `![...]` |
 
 **Chuyên mục** tự thêm ở cuối trang — Fintech, Học tập, Đời sống… tuỳ bạn. Bấm **Lưu chuyên mục**
 sau khi sửa.
