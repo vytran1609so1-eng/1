@@ -204,7 +204,7 @@ Thêm, sửa, ẩn, xoá từng hoạt động.
 | **Summary** | Một hai dòng hiện trên thẻ |
 | **Story** | Đoạn dài hiện trong cửa sổ nổi |
 | **Highlights** | Mỗi dòng là một gạch đầu dòng |
-| **Photographs** | Upload nhiều ảnh — chính là ảnh bay ra khi rê chuột và ảnh trong cửa sổ nổi. Để trống cũng được: mục không có ảnh thì rê chuột vẫn bình thường, chỉ là không có ảnh nào hiện ra |
+| **Photographs** | Upload nhiều ảnh. **Ảnh đầu tiên là ảnh bìa** — ảnh duy nhất hiện trên danh sách portfolio; rê chuột vào bìa thì những ảnh còn lại mới xoè ra như xấp ảnh. Bấm *Đặt bìa* trên một ảnh để đưa nó lên đầu. Để trống cũng được: mục không có ảnh thì chỉ có chữ |
 | **Links** | Nhãn + đường dẫn |
 | **Published** | Bỏ tick để giấu hẳn khỏi web |
 | **Show on portfolio** | Bỏ tick thì mục chỉ nằm ở Archive |

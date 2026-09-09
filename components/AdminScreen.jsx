@@ -567,11 +567,23 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
 
         <div className="md:col-span-2">
           <span className="eyebrow text-navy-soft">Photographs</span>
+          <p className="mt-1.5 text-[11.5px] leading-snug text-navy-soft">
+            Ảnh đầu tiên là <strong className="text-navy">ảnh bìa</strong> — ảnh duy nhất hiện trên
+            danh sách portfolio. Rê chuột vào bìa thì những ảnh còn lại mới xoè ra. Bấm{" "}
+            <em>Đặt bìa</em> trên một ảnh để đưa nó lên đầu.
+          </p>
           <div className="mt-3 flex flex-wrap gap-3">
             {form.images.map((url, i) => (
               <Thumb
                 key={url}
                 src={url}
+                isCover={i === 0}
+                onCover={() =>
+                  setForm((f) => ({
+                    ...f,
+                    images: [f.images[i], ...f.images.filter((_, j) => j !== i)],
+                  }))
+                }
                 onRemove={() => setForm((f) => ({ ...f, images: f.images.filter((_, j) => j !== i) }))}
               />
             ))}
@@ -2124,7 +2136,7 @@ function Check({ label, checked, onChange }) {
   );
 }
 
-function Thumb({ src, onRemove }) {
+function Thumb({ src, onRemove, onCover, isCover }) {
   return (
     <div className="relative h-24 w-32 overflow-hidden rounded-[3px] ring-1 ring-navy/10">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2137,6 +2149,22 @@ function Thumb({ src, onRemove }) {
       >
         ×
       </button>
+
+      {/* The first photograph is the one shown on the portfolio row. */}
+      {onCover &&
+        (isCover ? (
+          <span className="absolute bottom-1 left-1 rounded-full bg-azure px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-white">
+            Ảnh bìa
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onCover}
+            className="absolute bottom-1 left-1 rounded-full bg-navy/75 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-white transition hover:bg-azure"
+          >
+            Đặt bìa
+          </button>
+        ))}
     </div>
   );
 }
