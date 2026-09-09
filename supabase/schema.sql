@@ -112,3 +112,36 @@ where  a.category = b.category
   and  lower(btrim(a.title))            = lower(btrim(b.title))
   and  lower(btrim(coalesce(a.period,''))) = lower(btrim(coalesce(b.period,'')))
   and  (a.created_at, a.id) > (b.created_at, b.id);
+
+-- ---------------------------------------------------------------------------
+--  6. BLOG
+--  Safe to run on an existing project: it only creates what is missing and
+--  never touches the activities, the settings or the images you already have.
+-- ---------------------------------------------------------------------------
+create table if not exists public.blog_posts (
+  id           uuid primary key default gen_random_uuid(),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  slug         text not null unique,
+  title        text not null,
+  category     text,
+  excerpt      text,
+  body         text,
+  cover        text,
+  cover_x      int  default 50,
+  cover_y      int  default 50,
+  cover_zoom   real default 1,
+  published_at date,
+  published    boolean not null default true,
+  featured     boolean not null default false
+);
+
+-- newest first, and quick lookups by the address bar
+create index if not exists blog_posts_published_at_idx
+  on public.blog_posts (published_at desc nulls last, created_at desc);
+create index if not exists blog_posts_slug_idx on public.blog_posts (slug);
+
+-- Same lock-down as the other tables: no policies, so nothing in a browser can
+-- read or write directly. The website goes through the server with the secret
+-- key, which bypasses this.
+alter table public.blog_posts enable row level security;

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { IMAGE_GROUPS, IMAGE_SLOTS, isPlaceholder } from "@/lib/images";
 import { KEYWORD_IDS } from "@/lib/content";
 import { shrinkImage, makeThumb } from "@/lib/resize-image";
+import { slugify } from "@/lib/slug";
 
 const PW_KEY = "vy-admin-pw";
 
@@ -27,6 +28,8 @@ const EMPTY_ENTRY = {
 
 const TABS = [
   ["activities", "Activities"],
+  ["about", "About me"],
+  ["blog", "Blog"],
   ["sections", "Sections & keywords"],
   ["numbers", "Numbers"],
   ["images", "Images"],
@@ -294,7 +297,14 @@ export default function AdminScreen() {
             reload={() => load(pw)}
             setMsg={setMsg}
             uploadOne={uploadOne}
+            saveSettings={saveSettings}
           />
+        )}
+        {tab === "about" && (
+          <About settings={settings} save={saveSettings} uploadOne={uploadOne} />
+        )}
+        {tab === "blog" && (
+          <Blog pw={pw} settings={settings} save={saveSettings} setMsg={setMsg} uploadOne={uploadOne} />
         )}
         {tab === "sections" && <Sections settings={settings} save={saveSettings} />}
         {tab === "numbers" && <Numbers settings={settings} save={saveSettings} />}
@@ -310,7 +320,7 @@ export default function AdminScreen() {
 /* ========================================================================== */
 /*  1. ACTIVITIES                                                             */
 /* ========================================================================== */
-function Activities({ pw, entries, settings, reload, setMsg, uploadOne }) {
+function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSettings }) {
   const [form, setForm] = useState(EMPTY_ENTRY);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
@@ -409,6 +419,50 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne }) {
       body: JSON.stringify({ id: row.id }),
     });
     reload();
+  }
+
+  /* ---------------- running order ---------------- */
+
+  /** The library, grouped exactly the way the site groups it, each section in
+   *  the order it will actually appear. */
+  const grouped = useMemo(() => {
+    const order = settings.entryOrder || {};
+    const rank = (row) => {
+      const list = order[row.category];
+      if (!Array.isArray(list)) return Infinity;
+      const i = list.indexOf(row.id);
+      return i === -1 ? Infinity : i;
+    };
+    return (settings.categories || []).map((cat) => ({
+      ...cat,
+      rows: (entries || [])
+        .filter((r) => r.category === cat.id)
+        .sort((a, b) => {
+          const ra = rank(a);
+          const rb = rank(b);
+          if (ra !== rb) return ra - rb;
+          return String(b.sort_date || "").localeCompare(String(a.sort_date || ""));
+        }),
+    }));
+  }, [entries, settings]);
+
+  /** Move one activity up or down inside its section and save immediately. */
+  function moveEntry(categoryId, rows, index, dir) {
+    const target = index + dir;
+    if (target < 0 || target >= rows.length) return;
+    const ids = rows.map((r) => r.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    saveSettings({
+      ...settings,
+      entryOrder: { ...(settings.entryOrder || {}), [categoryId]: ids },
+    });
+  }
+
+  /** Forget the hand-made order for one section — back to newest first. */
+  function resetOrder(categoryId) {
+    const next = { ...(settings.entryOrder || {}) };
+    delete next[categoryId];
+    saveSettings({ ...settings, entryOrder: next });
   }
 
   /** Delete repeat copies of an activity, keeping the first one. */
@@ -579,36 +633,580 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne }) {
       <h2 className="display mt-14 text-[24px] text-navy">
         Your library <span className="text-navy-soft">· {entries.length}</span>
       </h2>
+      <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-navy-soft">
+        Grouped the way the portfolio groups them. The ↑ ↓ buttons set the running order inside a
+        section and save straight away — no need to press anything else. Activities you have never
+        moved stay in date order, newest first, below the ones you have arranged.
+      </p>
+
       {entries.length === 0 ? (
         <p className="mt-4 text-[14px] text-navy-soft">Nothing in the database yet.</p>
       ) : (
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
-          {entries.map((row) => (
-            <article
-              key={row.id}
-              className={`rounded-[5px] border p-5 ${
-                row.published ? "border-navy-line bg-white" : "border-azure/40 bg-paper-200"
-              }`}
-            >
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-azure">
-                {settings.categories.find((c) => c.id === row.category)?.label ?? row.category} ·{" "}
-                {row.period || "—"}
+        grouped.map((group) => (
+          <section key={group.id} className="mt-10">
+            <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-navy-line pb-2">
+              <h3 className="display text-[20px] text-navy">
+                {group.label} <span className="text-navy-soft">· {group.rows.length}</span>
+              </h3>
+              {(settings.entryOrder || {})[group.id] && (
+                <button
+                  type="button"
+                  onClick={() => resetOrder(group.id)}
+                  className="text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft transition hover:text-azure"
+                >
+                  Back to date order
+                </button>
+              )}
+            </div>
+
+            {group.rows.length === 0 ? (
+              <p className="mt-4 text-[13.5px] text-navy-soft">Nothing filed here yet.</p>
+            ) : (
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {group.rows.map((row, i) => (
+                  <article
+                    key={row.id}
+                    className={`flex gap-4 rounded-[5px] border p-5 ${
+                      row.published ? "border-navy-line bg-white" : "border-azure/40 bg-paper-200"
+                    }`}
+                  >
+                    {/* the two arrows, and the position they produce */}
+                    <div className="flex shrink-0 flex-col items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveEntry(group.id, group.rows, i, -1)}
+                        disabled={i === 0}
+                        aria-label="Move up"
+                        className="grid h-7 w-7 place-items-center rounded-full border border-navy/25 text-navy transition hover:border-azure hover:text-azure disabled:opacity-25"
+                      >
+                        ↑
+                      </button>
+                      <span className="text-[11px] tabular-nums text-navy-soft">{i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => moveEntry(group.id, group.rows, i, 1)}
+                        disabled={i === group.rows.length - 1}
+                        aria-label="Move down"
+                        className="grid h-7 w-7 place-items-center rounded-full border border-navy/25 text-navy transition hover:border-azure hover:text-azure disabled:opacity-25"
+                      >
+                        ↓
+                      </button>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-azure">
+                        {row.period || "—"}
+                      </p>
+                      <h4 className="mt-1.5 font-display text-[19px] leading-snug text-navy">
+                        {row.title}
+                      </h4>
+                      {row.role && (
+                        <p className="display-italic text-[15px] text-navy-soft">{row.role}</p>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]">
+                        <button type="button" onClick={() => edit(row)} className="rounded-full border border-navy px-3 py-1.5 text-navy transition hover:bg-navy hover:text-white">
+                          Edit
+                        </button>
+                        <button type="button" onClick={() => toggle(row, "in_portfolio")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
+                          {row.in_portfolio !== false ? "On portfolio" : "Archive only"}
+                        </button>
+                        <button type="button" onClick={() => toggle(row, "published")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
+                          {row.published ? "Visible" : "Hidden"}
+                        </button>
+                        <button type="button" onClick={() => remove(row)} className="rounded-full border border-azure/40 px-3 py-1.5 text-azure transition hover:bg-azure hover:text-white">
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        ))
+      )}
+    </>
+  );
+}
+
+
+/* ========================================================================== */
+/*  ABOUT ME                                                                  */
+/* ========================================================================== */
+function About({ settings, save, uploadOne }) {
+  const [draft, setDraft] = useState(settings);
+  const [busy, setBusy] = useState(null);
+  const inputs = useRef({});
+
+  const about = draft.about || { milestones: [] };
+  const list = about.milestones || [];
+
+  const setAbout = (patch) => setDraft((d) => ({ ...d, about: { ...d.about, ...patch } }));
+  const setList = (next) => setAbout({ milestones: next });
+  const upd = (i, patch) => setList(list.map((m, j) => (j === i ? { ...m, ...patch } : m)));
+
+  const add = () =>
+    setList([
+      ...list,
+      { id: `m-${Date.now()}`, year: String(new Date().getFullYear()), title: "", text: "", images: [] },
+    ]);
+
+  const drop = (i) => {
+    if (!confirm("Xoá mốc này?")) return;
+    setList(list.filter((_, j) => j !== i));
+  };
+
+  const move = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    setList(next);
+  };
+
+  async function addImages(i, files) {
+    if (!files.length) return;
+    setBusy(i);
+    const urls = [];
+    for (const f of files) {
+      const url = await uploadOne(f);
+      if (url) urls.push(url);
+    }
+    upd(i, { images: [...(list[i].images || []), ...urls] });
+    setBusy(null);
+  }
+
+  return (
+    <>
+      <h1 className="display text-[30px] text-navy">About me</h1>
+      <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-navy-soft">
+        A timeline down the page: one year, a few lines, and the photographs that belong to it. The
+        year only appears when it changes, so several moments from the same year read as one
+        chapter. Put them in the order you want them read — most people start with the most recent.
+      </p>
+
+      <div className="mt-6 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
+        <Field label="Eyebrow (the small line above the title)" value={about.eyebrow || ""} onChange={(e) => setAbout({ eyebrow: e.target.value })} />
+        <Field label="Title" value={about.title || ""} onChange={(e) => setAbout({ title: e.target.value })} />
+        <Area label="Intro" rows={3} value={about.lead || ""} onChange={(e) => setAbout({ lead: e.target.value })} />
+      </div>
+
+      <h2 className="display mt-12 text-[22px] text-navy">
+        Moments <span className="text-navy-soft">· {list.length}</span>
+      </h2>
+
+      <div className="mt-5 space-y-4">
+        {list.map((m, i) => (
+          <div key={m.id || i} className="grid gap-5 rounded-[5px] border border-navy-line bg-white p-5 md:grid-cols-[7rem_1fr]">
+            <div className="flex flex-row items-start gap-3 md:flex-col md:items-stretch">
+              <Field label="Year" value={m.year || ""} onChange={(e) => upd(i, { year: e.target.value })} placeholder="2026" />
+              <div className="flex gap-2 md:mt-3">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="grid h-8 w-8 place-items-center rounded-full border border-navy/25 text-navy transition hover:border-azure hover:text-azure disabled:opacity-25">↑</button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === list.length - 1} aria-label="Move down" className="grid h-8 w-8 place-items-center rounded-full border border-navy/25 text-navy transition hover:border-azure hover:text-azure disabled:opacity-25">↓</button>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <Field label="Title" value={m.title || ""} onChange={(e) => upd(i, { title: e.target.value })} placeholder="Erasmus+ ở Poznań" />
+              <Area label="A few lines" rows={3} value={m.text || ""} onChange={(e) => upd(i, { text: e.target.value })} />
+
+              <div>
+                <p className="eyebrow text-navy-soft">Photographs</p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {(m.images || []).map((src, k) => (
+                    <Thumb key={src + k} src={src} onRemove={() => upd(i, { images: m.images.filter((_, x) => x !== k) })} />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => inputs.current[`m${i}`]?.click()}
+                    disabled={busy === i}
+                    className="grid h-24 w-32 place-items-center rounded-[3px] border border-dashed border-navy/30 text-[12px] text-navy-soft transition hover:border-azure hover:text-azure disabled:opacity-50"
+                  >
+                    {busy === i ? "Uploading…" : "+ Add images"}
+                  </button>
+                  <input
+                    ref={(el) => (inputs.current[`m${i}`] = el)}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      e.target.value = "";
+                      addImages(i, files);
+                    }}
+                    className="hidden"
+                  />
+                </div>
+                <p className="mt-2 text-[11.5px] text-navy-soft">
+                  One picture fills the width; two or three sit side by side. Click one on the site
+                  to see it full size.
+                </p>
+              </div>
+
+              <button type="button" onClick={() => drop(i)} className="justify-self-start rounded-full border border-azure/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-azure transition hover:bg-azure hover:text-white">
+                Remove this moment
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button type="button" onClick={add} className="mt-4 rounded-full border border-navy-line px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-soft transition hover:border-azure hover:text-azure">
+        + Add a moment
+      </button>
+
+      <SaveBar onSave={() => save(draft)} onReset={() => setDraft(settings)} />
+    </>
+  );
+}
+
+
+/* ========================================================================== */
+/*  BLOG                                                                      */
+/* ========================================================================== */
+const EMPTY_POST = {
+  id: null,
+  title: "",
+  slug: "",
+  category: "",
+  excerpt: "",
+  body: "",
+  cover: "",
+  cover_x: 50,
+  cover_y: 50,
+  cover_zoom: 1,
+  published_at: "",
+  published: true,
+  featured: false,
+};
+
+function Blog({ pw, settings, save, setMsg, uploadOne }) {
+  const [posts, setPosts] = useState([]);
+  const [form, setForm] = useState(EMPTY_POST);
+  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [cats, setCats] = useState(settings.blog?.categories || []);
+  const coverRef = useRef(null);
+  const inlineRef = useRef(null);
+  const bodyRef = useRef(null);
+
+  const load = useCallback(async () => {
+    const res = await fetch("/api/blog/admin", {
+      headers: { "x-admin-password": pw },
+      cache: "no-store",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok) {
+      /* The table is created by supabase/schema.sql — say so plainly rather
+         than showing an empty screen that looks broken. */
+      setMsg(
+        /relation|does not exist|schema/i.test(String(data.reason))
+          ? "Chưa có bảng blog_posts — chạy lại supabase/schema.sql trong Supabase một lần."
+          : data.reason || "Không tải được danh sách bài."
+      );
+      setReady(true);
+      return;
+    }
+    setPosts(data.posts || []);
+    setReady(true);
+  }, [pw, setMsg]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const set = (k) => (e) =>
+    setForm((f) => ({
+      ...f,
+      [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value,
+    }));
+
+  const previewSlug = slugify(form.slug || form.title);
+
+  /* ---------------- categories ---------------- */
+  const addCat = () => setCats([...cats, { id: `muc-${Date.now()}`, label: "" }]);
+  const updCat = (i, label) =>
+    setCats(cats.map((c, j) => (j === i ? { ...c, label, id: slugify(label) || c.id } : c)));
+  const dropCat = (i) => setCats(cats.filter((_, j) => j !== i));
+  const saveCats = () =>
+    save({ ...settings, blog: { ...settings.blog, categories: cats.filter((c) => c.label.trim()) } });
+
+  /* ---------------- images ---------------- */
+  async function pickCover(file) {
+    if (!file) return;
+    setBusy(true);
+    const url = await uploadOne(file);
+    if (url) setForm((f) => ({ ...f, cover: url, cover_x: 50, cover_y: 50, cover_zoom: 1 }));
+    setBusy(false);
+  }
+
+  /** Upload a picture and drop it into the text at the cursor. */
+  async function insertImage(file) {
+    if (!file) return;
+    setBusy(true);
+    const url = await uploadOne(file);
+    setBusy(false);
+    if (!url) return;
+    const el = bodyRef.current;
+    const snippet = `\n\n![Chú thích ảnh](${url})\n\n`;
+    setForm((f) => {
+      const text = f.body || "";
+      const at = el ? el.selectionStart : text.length;
+      return { ...f, body: text.slice(0, at) + snippet + text.slice(at) };
+    });
+  }
+
+  /* ---------------- save / edit / delete ---------------- */
+  async function submit(e) {
+    e.preventDefault();
+    if (!form.title.trim()) return setMsg("Bài viết cần có tiêu đề.");
+    setBusy(true);
+    const res = await fetch("/api/blog/admin", {
+      method: form.id ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify(form),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!data.ok) {
+      setMsg(
+        data.reason === "slug_taken"
+          ? "Đường dẫn này đã có bài khác dùng rồi — đổi ô Đường dẫn."
+          : `Lưu không được: ${data.reason}`
+      );
+      return;
+    }
+    setForm(EMPTY_POST);
+    setMsg(form.id ? "Đã cập nhật bài viết." : "Đã đăng bài.");
+    load();
+  }
+
+  function edit(row) {
+    setForm({
+      id: row.id,
+      title: row.title || "",
+      slug: row.slug || "",
+      category: row.category || "",
+      excerpt: row.excerpt || "",
+      body: row.body || "",
+      cover: row.cover || "",
+      cover_x: row.cover_x ?? 50,
+      cover_y: row.cover_y ?? 50,
+      cover_zoom: row.cover_zoom ?? 1,
+      published_at: row.published_at || "",
+      published: row.published !== false,
+      featured: Boolean(row.featured),
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function toggle(row, field) {
+    await fetch("/api/blog/admin", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify({ id: row.id, [field]: !row[field] }),
+    });
+    load();
+  }
+
+  async function remove(row) {
+    if (!confirm(`Xoá hẳn bài “${row.title}”?`)) return;
+    await fetch("/api/blog/admin", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify({ id: row.id }),
+    });
+    load();
+  }
+
+  return (
+    <>
+      <h1 className="display text-[30px] text-navy">
+        {form.id ? "Sửa bài viết" : "Viết bài mới"}
+      </h1>
+
+      <form onSubmit={submit} className="mt-6 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6 md:p-8">
+        <Field label="Tiêu đề *" value={form.title} onChange={set("title")} placeholder="Tôi học được gì sau một kỳ ở Poznań" />
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <Field label="Đường dẫn (để trống sẽ tự tạo từ tiêu đề)" value={form.slug} onChange={set("slug")} placeholder="toi-hoc-duoc-gi-o-poznan" />
+            {previewSlug && (
+              <p className="mt-2 break-all text-[11.5px] text-navy-soft">
+                Địa chỉ bài: <span className="text-azure">/blog/{previewSlug}</span>
               </p>
-              <h3 className="mt-2 font-display text-[19px] text-navy">{row.title}</h3>
-              {row.role && <p className="display-italic text-[15px] text-navy-soft">{row.role}</p>}
+            )}
+          </div>
+          <Select label="Chuyên mục" value={form.category} onChange={set("category")}>
+            <option value="">— chưa xếp mục —</option>
+            {(settings.blog?.categories || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Ngày đăng" type="date" value={form.published_at} onChange={set("published_at")} />
+          <div className="flex items-end gap-6 pb-1">
+            <Check label="Hiện trên web" checked={form.published} onChange={set("published")} />
+            <Check label="Bài nổi bật" checked={form.featured} onChange={set("featured")} />
+          </div>
+        </div>
+
+        <Area label="Tóm tắt (2–3 dòng, hiện ở danh sách và đầu bài)" rows={3} value={form.excerpt} onChange={set("excerpt")} />
+
+        {/* ---- cover ---- */}
+        <div>
+          <p className="eyebrow text-navy-soft">Ảnh bìa</p>
+          <div className="mt-3 grid gap-4 md:grid-cols-[240px_1fr]">
+            <div>
+              <div className="relative grid aspect-[4/3] place-items-center overflow-hidden rounded-[3px] bg-paper-300">
+                {form.cover ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={form.cover}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${form.cover_x}% ${form.cover_y}%`,
+                      transform: `scale(${form.cover_zoom})`,
+                      transformOrigin: `${form.cover_x}% ${form.cover_y}%`,
+                    }}
+                  />
+                ) : (
+                  <span className="text-[11px] uppercase tracking-[0.16em] text-navy-soft/60">
+                    Chưa có ảnh
+                  </span>
+                )}
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => coverRef.current?.click()} disabled={busy} className="flex-1 rounded-[3px] bg-navy px-3 py-2 text-[11.5px] font-semibold text-white transition hover:bg-azure disabled:opacity-50">
+                  {busy ? "Đang tải…" : form.cover ? "Đổi ảnh" : "Chọn ảnh"}
+                </button>
+                {form.cover && (
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, cover: "" }))} className="rounded-[3px] border border-navy-line px-3 py-2 text-[11.5px] font-semibold text-navy-soft transition hover:border-azure hover:text-azure">
+                    Bỏ
+                  </button>
+                )}
+              </div>
+              <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; pickCover(f); }} />
+            </div>
+
+            {form.cover && (
+              <div className="space-y-2 self-center">
+                <Range label="Ngang" value={form.cover_x} min={0} max={100} onChange={(v) => setForm((f) => ({ ...f, cover_x: v }))} />
+                <Range label="Dọc" value={form.cover_y} min={0} max={100} onChange={(v) => setForm((f) => ({ ...f, cover_y: v }))} />
+                <Range label="Phóng" value={Math.round(form.cover_zoom * 100)} min={100} max={260} onChange={(v) => setForm((f) => ({ ...f, cover_zoom: v / 100 }))} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ---- body ---- */}
+        <div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="eyebrow text-navy-soft">Nội dung bài</p>
+            <button type="button" onClick={() => inlineRef.current?.click()} disabled={busy} className="rounded-full border border-navy-line px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft transition hover:border-azure hover:text-azure disabled:opacity-50">
+              {busy ? "Đang tải…" : "Chèn ảnh vào bài"}
+            </button>
+            <input ref={inlineRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; insertImage(f); }} />
+          </div>
+
+          <textarea
+            ref={bodyRef}
+            value={form.body}
+            onChange={set("body")}
+            rows={20}
+            placeholder="Viết ở đây…"
+            className="mt-3 w-full rounded-[3px] border border-navy/20 bg-paper p-4 font-mono text-[13.5px] leading-[1.7] text-navy outline-none focus:border-azure"
+          />
+
+          <details className="mt-3 rounded-[3px] border border-navy-line bg-paper-200 p-4">
+            <summary className="cursor-pointer text-[12.5px] font-semibold text-navy">
+              Cách gõ để chữ có định dạng
+            </summary>
+            <ul className="mt-3 space-y-1.5 text-[12.5px] leading-relaxed text-navy-soft">
+              <li><code className="rounded bg-navy/10 px-1">## Tiêu đề lớn</code> · <code className="rounded bg-navy/10 px-1">### Tiêu đề nhỏ</code></li>
+              <li><code className="rounded bg-navy/10 px-1">**in đậm**</code> · <code className="rounded bg-navy/10 px-1">*in nghiêng*</code></li>
+              <li><code className="rounded bg-navy/10 px-1">- gạch đầu dòng</code> · <code className="rounded bg-navy/10 px-1">1. đánh số</code></li>
+              <li><code className="rounded bg-navy/10 px-1">&gt; câu trích dẫn</code></li>
+              <li><code className="rounded bg-navy/10 px-1">[chữ hiện ra](https://...)</code> để làm link</li>
+              <li><code className="rounded bg-navy/10 px-1">![chú thích](link-ảnh)</code> — hoặc bấm “Chèn ảnh vào bài”, chữ trong ngoặc vuông thành chú thích dưới ảnh</li>
+              <li>Cách một dòng trống là sang đoạn mới.</li>
+            </ul>
+          </details>
+        </div>
+
+        <div className="flex flex-wrap gap-4">
+          <button type="submit" disabled={busy} className="rounded-full bg-navy px-8 py-3 text-[11.5px] font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-azure disabled:opacity-50">
+            {form.id ? "Lưu bài viết" : "Đăng bài"}
+          </button>
+          {form.id && (
+            <button type="button" onClick={() => setForm(EMPTY_POST)} className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-navy-soft transition hover:text-azure">
+              Huỷ, viết bài mới
+            </button>
+          )}
+        </div>
+      </form>
+
+      {/* ---------------- categories ---------------- */}
+      <h2 className="display mt-14 text-[22px] text-navy">Chuyên mục</h2>
+      <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-navy-soft">
+        Tự đặt tên mục theo ý bạn. Đổi tên một mục đang có bài thì các bài cũ vẫn giữ mục cũ — nên
+        đặt xong hãy viết bài.
+      </p>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {cats.map((c, i) => (
+          <div key={i} className="flex items-center gap-3 rounded-[5px] border border-navy-line bg-white p-4">
+            <input
+              value={c.label}
+              onChange={(e) => updCat(i, e.target.value)}
+              placeholder="Tên chuyên mục"
+              className="flex-1 border-b border-navy/25 bg-transparent pb-1 text-[14px] text-navy outline-none focus:border-azure"
+            />
+            <button type="button" onClick={() => dropCat(i)} aria-label="Xoá mục" className="text-[18px] leading-none text-navy-soft/50 transition hover:text-azure">×</button>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button type="button" onClick={addCat} className="rounded-full border border-navy-line px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-soft transition hover:border-azure hover:text-azure">
+          + Thêm chuyên mục
+        </button>
+        <button type="button" onClick={saveCats} className="rounded-full bg-navy px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-azure">
+          Lưu chuyên mục
+        </button>
+      </div>
+
+      {/* ---------------- list ---------------- */}
+      <h2 className="display mt-14 text-[22px] text-navy">
+        Bài đã viết <span className="text-navy-soft">· {posts.length}</span>
+      </h2>
+      {!ready ? (
+        <p className="mt-4 text-[14px] text-navy-soft">Đang tải…</p>
+      ) : posts.length === 0 ? (
+        <p className="mt-4 text-[14px] text-navy-soft">Chưa có bài nào.</p>
+      ) : (
+        <div className="mt-5 grid gap-3 md:grid-cols-2">
+          {posts.map((row) => (
+            <article key={row.id} className={`rounded-[5px] border p-5 ${row.published ? "border-navy-line bg-white" : "border-azure/40 bg-paper-200"}`}>
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-azure">
+                {(settings.blog?.categories || []).find((c) => c.id === row.category)?.label || "—"}
+                {row.published_at ? ` · ${row.published_at}` : ""}
+                {row.featured ? " · nổi bật" : ""}
+              </p>
+              <h3 className="mt-2 font-display text-[19px] leading-snug text-navy">{row.title}</h3>
+              <p className="mt-1 break-all text-[11.5px] text-navy-soft">/blog/{row.slug}</p>
               <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]">
-                <button type="button" onClick={() => edit(row)} className="rounded-full border border-navy px-3 py-1.5 text-navy transition hover:bg-navy hover:text-white">
-                  Edit
-                </button>
-                <button type="button" onClick={() => toggle(row, "in_portfolio")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
-                  {row.in_portfolio !== false ? "On portfolio" : "Archive only"}
-                </button>
+                <button type="button" onClick={() => edit(row)} className="rounded-full border border-navy px-3 py-1.5 text-navy transition hover:bg-navy hover:text-white">Sửa</button>
                 <button type="button" onClick={() => toggle(row, "published")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
-                  {row.published ? "Visible" : "Hidden"}
+                  {row.published ? "Đang hiện" : "Đang ẩn"}
                 </button>
-                <button type="button" onClick={() => remove(row)} className="rounded-full border border-azure/40 px-3 py-1.5 text-azure transition hover:bg-azure hover:text-white">
-                  Delete
+                <button type="button" onClick={() => toggle(row, "featured")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
+                  {row.featured ? "Bỏ nổi bật" : "Đặt nổi bật"}
                 </button>
+                <button type="button" onClick={() => remove(row)} className="rounded-full border border-azure/40 px-3 py-1.5 text-azure transition hover:bg-azure hover:text-white">Xoá</button>
               </div>
             </article>
           ))}

@@ -211,10 +211,49 @@ Thêm, sửa, ẩn, xoá từng hoạt động.
 > 13 hoạt động lấy từ CV (`lib/seed-entries.js`) tự được chép vào database để bạn sửa được ngay.
 > Việc này chỉ xảy ra đúng một lần: hoạt động nào bạn xoá sau đó sẽ không quay lại.
 
+**Sắp xếp thứ tự hoạt động.** Phần *Your library* bên dưới form được chia theo đúng 5 chuyên mục
+như ngoài web. Mỗi thẻ có hai nút **↑ ↓** ở bên trái kèm số thứ tự — bấm là đổi chỗ và **lưu ngay**,
+không cần bấm Save. Hoạt động nào bạn chưa động tới vẫn xếp theo ngày, mới nhất trước, và nằm dưới
+những mục bạn đã sắp tay. Muốn bỏ thứ tự tự sắp của một chuyên mục: bấm **Back to date order** ở
+góc phải tên chuyên mục đó.
+
+> Thứ tự được lưu trong phần cài đặt (`settings.entryOrder`), không phải trong bảng hoạt động —
+> nên không cần chạy thêm SQL nào cả.
+
 **Nếu một hoạt động hiện lặp lại nhiều lần trên web:** mở `/admin`, tab Activities sẽ tự hiện
 khung **"Remove duplicates"** kèm số bản thừa. Bấm một lần là xong — bản đầu tiên của mỗi hoạt
 động được giữ lại cùng mọi chỉnh sửa bạn đã làm trên nó. (Cách khác: chạy lại
 `supabase/schema.sql` trong SQL Editor của Supabase — phần 5 ở cuối file làm đúng việc này.)
+
+### About me
+
+Dòng thời gian ở trang `/about`. Mỗi mốc gồm **năm**, **tiêu đề**, **vài dòng** và **ảnh**
+(một ảnh chiếm hết chiều ngang, hai–ba ảnh xếp cạnh nhau, bấm vào xem toàn màn hình).
+Năm chỉ hiện khi đổi, nên nhiều mốc cùng năm đọc như một chương. Nút **↑ ↓** đổi thứ tự — thường
+là mới nhất lên đầu. Nhớ bấm **Save changes** ở cuối trang.
+
+### Blog
+
+Toàn bộ phần này bằng tiếng Việt vì bài viết bằng tiếng Việt.
+
+| Ô | Ý nghĩa |
+|---|---|
+| **Tiêu đề** | Bắt buộc |
+| **Đường dẫn** | Để trống thì tự tạo từ tiêu đề, bỏ dấu: `toi-hoc-duoc-gi-o-poznan`. Địa chỉ bài hiện ngay bên dưới |
+| **Chuyên mục** | Chọn trong danh sách bạn tự tạo ở cuối trang |
+| **Ngày đăng** | Quyết định thứ tự bài, mới nhất lên đầu |
+| **Hiện trên web** | Bỏ tick = bản nháp, chỉ mình bạn thấy trong admin |
+| **Bài nổi bật** | Bài được đưa lên đầu trang blog, khổ lớn. Chỉ nên có một |
+| **Tóm tắt** | 2–3 dòng, hiện ở danh sách và ngay dưới tiêu đề trong bài |
+| **Ảnh bìa** | Ảnh đại diện ngoài danh sách, có ba thanh trượt căn khung |
+| **Nội dung bài** | Gõ theo cú pháp trong khung *Cách gõ để chữ có định dạng*. Nút **Chèn ảnh vào bài** upload ảnh và chèn thẳng vào chỗ con trỏ |
+
+**Chuyên mục** tự thêm ở cuối trang — Fintech, Học tập, Đời sống… tuỳ bạn. Bấm **Lưu chuyên mục**
+sau khi sửa.
+
+> **Trước khi dùng blog lần đầu:** chạy lại `supabase/schema.sql` trong SQL Editor của Supabase.
+> Phần 6 ở cuối file tạo bảng `blog_posts`. Đoạn SQL này chỉ tạo cái chưa có, **không đụng** tới
+> hoạt động, cài đặt hay ảnh bạn đã có.
 
 ### Sections & keywords
 
@@ -320,6 +359,18 @@ Cách nhanh nhất là vào `/admin` → *Text*. Nếu muốn sửa trong code:
   > bạn lăn chuột mạnh cỡ nào. Đây từng là lỗi làm trang cuộn cực chậm.
 - **Con trỏ:** `components/Cursor.jsx`. Thêm `data-cursor="VIEW"` vào phần tử nào thì con trỏ đổi
   thành huy hiệu có chữ đó.
+
+### Xem có bao nhiêu người ghé thăm
+
+Web đã gắn sẵn **Vercel Web Analytics**. Bật một lần là chạy:
+
+1. Vercel → chọn project → **Analytics** ở thanh bên → bấm **Enable**
+2. Deploy lại một lần (đẩy commit bất kỳ) để trang nhận đoạn mã đo
+3. Vài ngày sau vào lại mục Analytics để xem lượt xem theo ngày, trang nào được đọc nhiều, khách
+   đến từ đâu
+
+Miễn phí ở gói Hobby, không dùng cookie và không thu thập thông tin cá nhân của khách.
+Chưa bật ở Vercel thì đoạn mã nằm im, không ảnh hưởng gì tới tốc độ.
 
 ### Khi web có rất nhiều ảnh
 

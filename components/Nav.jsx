@@ -42,7 +42,7 @@ export default function Nav({ signature }) {
           {name}
         </Link>
 
-        <nav className="hidden items-center gap-9 md:flex">
+        <nav className="hidden items-center gap-6 md:flex lg:gap-8">
           {nav.map((item) => {
             const active =
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -50,7 +50,7 @@ export default function Nav({ signature }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative py-1 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors ${
+                className={`relative py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] transition-colors lg:text-[11px] lg:tracking-[0.18em] ${
                   transparent
                     ? active
                       ? "text-white"

@@ -4,6 +4,7 @@ import SmoothScroll from "@/components/SmoothScroll";
 import Cursor from "@/components/Cursor";
 import Nav from "@/components/Nav";
 import EditPanel from "@/components/EditPanel";
+import { Analytics } from "@vercel/analytics/next";
 import { getSettings } from "@/lib/data";
 
 export const metadata = {
@@ -54,6 +55,10 @@ export default async function RootLayout({ children }) {
           {children}
           <EditPanel />
         </SiteProvider>
+        {/* Vercel Web Analytics — how many people visit, and which pages they
+            read. No cookies, no personal data. Switch it on once in Vercel:
+            project → Analytics → Enable. */}
+        <Analytics />
       </body>
     </html>
   );
