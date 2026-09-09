@@ -785,11 +785,10 @@ function About({ settings, save, uploadOne }) {
         chapter. Put them in the order you want them read — most people start with the most recent.
       </p>
 
-      <div className="mt-6 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
-        <Field label="Eyebrow (the small line above the title)" value={about.eyebrow || ""} onChange={(e) => setAbout({ eyebrow: e.target.value })} />
-        <Field label="Title" value={about.title || ""} onChange={(e) => setAbout({ title: e.target.value })} />
-        <Area label="Intro" rows={3} value={about.lead || ""} onChange={(e) => setAbout({ lead: e.target.value })} />
-      </div>
+      <p className="mt-4 rounded-[5px] border border-navy-line bg-white px-5 py-4 text-[13.5px] leading-relaxed text-navy-soft">
+        Tiêu đề và đoạn mở đầu của trang này nằm chung với chữ của mọi trang khác, ở tab{" "}
+        <strong className="text-navy">Text</strong> → khu <strong className="text-navy">About me</strong>.
+      </p>
 
       <h2 className="display mt-12 text-[22px] text-navy">
         Moments <span className="text-navy-soft">· {list.length}</span>
@@ -1821,6 +1820,12 @@ function TextTab({ settings, save }) {
       ui: { ...d.ui, [page]: { ...d.ui[page], [key]: e.target.value } },
     }));
 
+  const setBlogUi = (key) => (e) =>
+    setDraft((d) => ({
+      ...d,
+      blog: { ...d.blog, ui: { ...(d.blog?.ui || {}), [key]: e.target.value } },
+    }));
+
   const setContactLabel = (key) => (e) =>
     setDraft((d) => ({
       ...d,
@@ -1894,6 +1899,44 @@ function TextTab({ settings, save }) {
         <Field label="Heading above the photographs" value={draft.ui.portfolio.galleryLabel} onChange={setUi("portfolio", "galleryLabel")} />
         <Field label="Heading above the links" value={draft.ui.portfolio.linksLabel} onChange={setUi("portfolio", "linksLabel")} />
         <Field label="Close button" value={draft.ui.portfolio.closeLabel} onChange={setUi("portfolio", "closeLabel")} />
+      </div>
+
+      {/* ---------------------------------------------------------------- */}
+      <h2 className="display mt-12 text-[22px] text-navy">About me</h2>
+      <div className="mt-5 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Eyebrow" value={draft.about?.eyebrow || ""} onChange={setIn("about", "eyebrow")} />
+          <Field label="Title" value={draft.about?.title || ""} onChange={setIn("about", "title")} />
+        </div>
+        <Area label="Intro" rows={3} value={draft.about?.lead || ""} onChange={setIn("about", "lead")} />
+        <p className="text-[13px] text-navy-soft">
+          Từng mốc thời gian (năm, tiêu đề, ảnh, chú thích) nằm ở tab{" "}
+          <strong className="text-navy">About me</strong>.
+        </p>
+      </div>
+
+      {/* ---------------------------------------------------------------- */}
+      <h2 className="display mt-12 text-[22px] text-navy">Blog</h2>
+      <div className="mt-5 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Eyebrow" value={draft.blog?.eyebrow || ""} onChange={setIn("blog", "eyebrow")} />
+          <Field label="Title" value={draft.blog?.title || ""} onChange={setIn("blog", "title")} />
+        </div>
+        <Area label="Intro" rows={3} value={draft.blog?.lead || ""} onChange={setIn("blog", "lead")} />
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Nút lọc tất cả" value={draft.blog?.ui?.allLabel || ""} onChange={setBlogUi("allLabel")} />
+          <Field label="Nhãn bài nổi bật" value={draft.blog?.ui?.featuredLabel || ""} onChange={setBlogUi("featuredLabel")} />
+          <Field label="Tiêu đề nhóm bài còn lại" value={draft.blog?.ui?.moreLabel || ""} onChange={setBlogUi("moreLabel")} />
+          <Field label="Link đọc tiếp" value={draft.blog?.ui?.readMore || ""} onChange={setBlogUi("readMore")} />
+          <Field label="Link quay về danh sách" value={draft.blog?.ui?.backToList || ""} onChange={setBlogUi("backToList")} />
+          <Field label="Chữ sau số phút đọc" value={draft.blog?.ui?.minuteRead || ""} onChange={setBlogUi("minuteRead")} />
+          <Field label="Khi chuyên mục chưa có bài" value={draft.blog?.ui?.empty || ""} onChange={setBlogUi("empty")} className="md:col-span-2" />
+        </div>
+        <p className="text-[13px] text-navy-soft">
+          Danh sách chuyên mục và các bài viết nằm ở tab{" "}
+          <strong className="text-navy">Blog</strong>.
+        </p>
       </div>
 
       {/* ---------------------------------------------------------------- */}

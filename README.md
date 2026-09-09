@@ -72,7 +72,9 @@ Bảng màu **trắng · xanh dịu · navy**:
 Font:
 
 - **Ephesis** — chữ ký viết tay, dùng cho tên bạn (dự phòng: Great Vibes)
-- **Instrument Serif** *nghiêng* — ba từ khoá và các tiêu đề lớn, nét cong mềm
+- **Playfair Display** *nghiêng* — ba từ khoá và các tiêu đề lớn, nét cong mềm. Chọn font này
+  vì nó **có đầy đủ tiếng Việt**: font cũ (Instrument Serif) không có, nên tiêu đề tiếng Việt bị
+  rớt dấu, chữ và dấu tách rời nhau
 - **Inter** — thân bài, nhãn, nút
 
 ### Chuyển động
@@ -282,7 +284,11 @@ trang Home. Bên dưới là nền Home, bìa Portfolio, nền Contact và các 
 
 ### Text
 
-**Toàn bộ chữ trên web**, chia theo từng trang: tên viết tay ở trang bìa, câu hook, đoạn giới
+**Toàn bộ chữ trên web**, chia theo từng trang — bao gồm cả tiêu đề/đoạn mở đầu của
+**About me** và **Blog** (các nhãn nhỏ của blog như *Đọc tiếp*, *Bài nổi bật*, *phút đọc* cũng ở đây).
+Riêng từng mốc thời gian của About và từng bài viết thì nằm ở tab của chúng.
+
+Chia theo từng trang: tên viết tay ở trang bìa, câu hook, đoạn giới
 thiệu, dải số liệu chạy ngang, chữ trên các nút, tiêu đề nhỏ của từng khu, chữ trang Portfolio /
 Archive / Contact, và thông tin liên hệ kể cả link LinkedIn / Facebook. Không còn nhãn nào phải
 sửa trong code.
@@ -348,6 +354,19 @@ Cách nhanh nhất là vào `/admin` → *Text*. Nếu muốn sửa trong code:
 - **Màu:** `tailwind.config.js` → `colors` (`paper`, `navy`, `azure`). Sửa hex là đổi tông cả web.
 - **Font:** `app/layout.js` (thẻ `<link>` Google Fonts) và `app/globals.css`
   (`--font-sans`, `--font-display`, `--font-script`).
+
+  > ⚠️ **Đổi font nào cũng phải kiểm tra font đó có tiếng Việt không.** Rất nhiều font đẹp trên
+  > Google Fonts chỉ có `latin` và `latin-ext`, thiếu bộ `vietnamese` — dùng vào là tiêu đề tiếng
+  > Việt rớt dấu ngay. Cách kiểm tra nhanh: mở
+  > `https://fonts.googleapis.com/css2?family=TEN+FONT&display=swap` trên trình duyệt, tìm dòng
+  > `/* vietnamese */`. Có dòng đó là dùng được.
+  >
+  > Đã kiểm tra sẵn — **có** tiếng Việt: Playfair Display, Cormorant Garamond, EB Garamond, Lora,
+  > Yeseva One, Ephesis, Great Vibes, Dancing Script, Style Script, Pacifico.
+  > **Không có**: Instrument Serif, Marcellus, Parisienne, Sacramento.
+  >
+  > Muốn tiêu đề mảnh và bay hơn nữa thì đổi `--font-display` sang `"Cormorant Garamond"`
+  > (nhớ sửa cả tên font trong link Google Fonts ở `app/layout.js`).
   Không thích chữ ký Ephesis thì đổi `--font-script` sang `Great Vibes`, `Parisienne`,
   `Sacramento` hoặc `Style Script` — nhớ sửa cả tên font trong link Google Fonts.
 - **Chuyển động:** tất cả nằm trong `components/Motion.jsx`
