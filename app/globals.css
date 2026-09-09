@@ -4,7 +4,16 @@
 
 :root {
   --font-sans: "Inter";
-  --font-display: "Instrument Serif";
+  /**
+   * Playfair Display, not Instrument Serif.
+   *
+   * Instrument Serif has no Vietnamese in it. A heading like "Vậy là sắp hết"
+   * therefore came out with the accents detached and floating, because the
+   * browser had to fetch every accented letter from a different font. Playfair
+   * carries the full Vietnamese set, and keeps the same high-contrast,
+   * flowing look — its italic even more so.
+   */
+  --font-display: "Playfair Display";
   --font-script: "Ephesis";
 }
 

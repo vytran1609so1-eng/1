@@ -5,6 +5,10 @@ import { slugify } from "@/lib/slug";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/** Postgres says this when supabase/schema.sql has never been run. */
+const missingTable = (message) =>
+  /relation .*blog_posts.* does not exist|could not find the table/i.test(String(message));
+
 const guard = (request) => {
   if (!isConfigured())
     return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 503 });
@@ -28,6 +32,7 @@ function clean(body) {
       excerpt: String(body?.excerpt ?? "").trim().slice(0, 400) || null,
       body: String(body?.body ?? "").slice(0, 80000) || null,
       cover: String(body?.cover ?? "").trim().slice(0, 500) || null,
+      cover_caption: String(body?.cover_caption ?? "").trim().slice(0, 300) || null,
       cover_x: Number.isFinite(+body?.cover_x) ? Math.round(+body.cover_x) : 50,
       cover_y: Number.isFinite(+body?.cover_y) ? Math.round(+body.cover_y) : 50,
       cover_zoom: Number.isFinite(+body?.cover_zoom) ? +body.cover_zoom : 1,
@@ -51,7 +56,11 @@ export async function GET(request) {
     .order("created_at", { ascending: false })
     .limit(300);
 
-  if (error) return NextResponse.json({ ok: false, reason: error.message }, { status: 500 });
+  if (error)
+    return NextResponse.json(
+      { ok: false, reason: missingTable(error.message) ? "no_table" : error.message },
+      { status: 500 }
+    );
   return NextResponse.json({ ok: true, posts: data ?? [] });
 }
 
@@ -71,8 +80,10 @@ export async function POST(request) {
     .single();
 
   if (error) {
-    // A duplicate address is the one mistake worth explaining properly.
-    const reason = /duplicate|unique/i.test(error.message)
+    // The two mistakes worth explaining properly rather than in Postgres-speak.
+    const reason = missingTable(error.message)
+      ? "no_table"
+      : /duplicate|unique/i.test(error.message)
       ? "slug_taken"
       : error.message;
     return NextResponse.json({ ok: false, reason }, { status: 500 });
@@ -105,7 +116,11 @@ export async function PATCH(request) {
 
   const { error } = await getSupabase().from(POSTS_TABLE).update(data).eq("id", id);
   if (error) {
-    const reason = /duplicate|unique/i.test(error.message) ? "slug_taken" : error.message;
+    const reason = missingTable(error.message)
+      ? "no_table"
+      : /duplicate|unique/i.test(error.message)
+      ? "slug_taken"
+      : error.message;
     return NextResponse.json({ ok: false, reason }, { status: 500 });
   }
   return NextResponse.json({ ok: true });

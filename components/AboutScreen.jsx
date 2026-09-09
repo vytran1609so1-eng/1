@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import Footer from "./Footer";
 import Lightbox from "./Lightbox";
 import { Reveal, Words, Orbs } from "./Motion";
-import { thumbOf } from "@/lib/images";
+import { asPhoto, thumbOf } from "@/lib/images";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -24,7 +24,7 @@ export default function AboutScreen({ settings }) {
 
   /* Which picture is open full size, as [milestone index, image index]. */
   const [zoom, setZoom] = useState(null);
-  const zoomImages = zoom ? milestones[zoom[0]]?.images || [] : [];
+  const zoomPhotos = zoom ? (milestones[zoom[0]]?.images || []).map(asPhoto).filter((p) => p.src) : [];
 
   return (
     <main className="pt-16">
@@ -80,7 +80,8 @@ export default function AboutScreen({ settings }) {
       </section>
 
       <Lightbox
-        images={zoomImages}
+        images={zoomPhotos.map((p) => p.src)}
+        captions={zoomPhotos.map((p) => p.caption)}
         index={zoom ? zoom[1] : null}
         onClose={() => setZoom(null)}
         onIndex={(next) => setZoom(([mi]) => [mi, next])}
@@ -93,7 +94,7 @@ export default function AboutScreen({ settings }) {
 
 function Milestone({ milestone, index, showYear, onZoom }) {
   const reduce = useReducedMotion();
-  const images = (milestone.images || []).filter(Boolean);
+  const photos = (milestone.images || []).map(asPhoto).filter((p) => p.src);
 
   return (
     <motion.article
@@ -129,33 +130,39 @@ function Milestone({ milestone, index, showYear, onZoom }) {
           </p>
         )}
 
-        {images.length > 0 && (
+        {photos.length > 0 && (
           <div
-            className={`mt-6 grid gap-3 ${
-              images.length === 1 ? "max-w-2xl" : images.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"
+            className={`mt-6 grid gap-x-3 gap-y-5 ${
+              photos.length === 1 ? "max-w-2xl" : photos.length === 2 ? "sm:grid-cols-2" : "sm:grid-cols-3"
             }`}
           >
-            {images.map((src, i) => (
-              <button
-                key={src + i}
-                type="button"
-                onClick={() => onZoom(i)}
-                data-cursor="XEM"
-                aria-label={`${milestone.title || milestone.year} — ảnh ${i + 1}`}
-                className={`group relative overflow-hidden rounded-[4px] bg-paper-300 ring-1 ring-navy/10 ${
-                  images.length === 1 ? "aspect-[16/10]" : "aspect-[4/3]"
-                }`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumbOf(src)}
-                  onError={(e) => (e.currentTarget.src = src)}
-                  alt=""
-                  loading={index < 2 ? "eager" : "lazy"}
-                  decoding="async"
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
-                />
-              </button>
+            {photos.map((photo, i) => (
+              <figure key={photo.src + i}>
+                <button
+                  type="button"
+                  onClick={() => onZoom(i)}
+                  data-cursor="XEM"
+                  aria-label={photo.caption || `${milestone.title || milestone.year} — ảnh ${i + 1}`}
+                  className={`group relative block w-full overflow-hidden rounded-[4px] bg-paper-300 ring-1 ring-navy/10 ${
+                    photos.length === 1 ? "aspect-[16/10]" : "aspect-[4/3]"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={thumbOf(photo.src)}
+                    onError={(e) => (e.currentTarget.src = photo.src)}
+                    alt={photo.caption || ""}
+                    loading={index < 2 ? "eager" : "lazy"}
+                    decoding="async"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+                  />
+                </button>
+                {photo.caption && (
+                  <figcaption className="mt-2.5 text-[12.5px] leading-relaxed text-navy-soft">
+                    {photo.caption}
+                  </figcaption>
+                )}
+              </figure>
             ))}
           </div>
         )}

@@ -21,13 +21,14 @@ export default function PostScreen({ settings, post, more = [] }) {
 
   return (
     <main className="pt-16">
-      {!reduce && (
-        <motion.div
-          className="fixed left-0 top-16 z-40 h-[2px] w-full origin-left bg-azure"
-          style={{ scaleX: progress }}
-          aria-hidden="true"
-        />
-      )}
+      {/* The reading bar is always in the tree — only its motion is optional.
+          Branching the DOM on useReducedMotion() breaks hydration, because the
+          server and the browser's first render disagree about it. */}
+      <motion.div
+        className="fixed left-0 top-16 z-40 h-[2px] w-full origin-left bg-azure"
+        style={reduce ? { scaleX: 0 } : { scaleX: progress }}
+        aria-hidden="true"
+      />
 
       {/* ==================== HEADER ==================== */}
       <article>
@@ -71,7 +72,7 @@ export default function PostScreen({ settings, post, more = [] }) {
 
         {post.cover && (
           <Reveal>
-            <div className="wrap max-w-5xl">
+            <figure className="wrap max-w-5xl">
               <div className="relative aspect-[16/9] overflow-hidden rounded-[4px] bg-paper-300">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -85,7 +86,12 @@ export default function PostScreen({ settings, post, more = [] }) {
                   }}
                 />
               </div>
-            </div>
+              {post.coverCaption && (
+                <figcaption className="mt-3 text-[12.5px] leading-relaxed text-navy-soft">
+                  {post.coverCaption}
+                </figcaption>
+              )}
+            </figure>
           </Reveal>
         )}
 

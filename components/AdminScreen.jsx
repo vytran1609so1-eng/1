@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { IMAGE_GROUPS, IMAGE_SLOTS, isPlaceholder } from "@/lib/images";
+import { IMAGE_GROUPS, IMAGE_SLOTS, isPlaceholder, asPhoto } from "@/lib/images";
 import { KEYWORD_IDS } from "@/lib/content";
 import { shrinkImage, makeThumb } from "@/lib/resize-image";
 import { slugify } from "@/lib/slug";
@@ -772,7 +772,7 @@ function About({ settings, save, uploadOne }) {
       const url = await uploadOne(f);
       if (url) urls.push(url);
     }
-    upd(i, { images: [...(list[i].images || []), ...urls] });
+    upd(i, { images: [...(list[i].images || []), ...urls.map((src) => ({ src, caption: "" }))] });
     setBusy(null);
   }
 
@@ -785,11 +785,10 @@ function About({ settings, save, uploadOne }) {
         chapter. Put them in the order you want them read — most people start with the most recent.
       </p>
 
-      <div className="mt-6 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
-        <Field label="Eyebrow (the small line above the title)" value={about.eyebrow || ""} onChange={(e) => setAbout({ eyebrow: e.target.value })} />
-        <Field label="Title" value={about.title || ""} onChange={(e) => setAbout({ title: e.target.value })} />
-        <Area label="Intro" rows={3} value={about.lead || ""} onChange={(e) => setAbout({ lead: e.target.value })} />
-      </div>
+      <p className="mt-4 rounded-[5px] border border-navy-line bg-white px-5 py-4 text-[13.5px] leading-relaxed text-navy-soft">
+        Tiêu đề và đoạn mở đầu của trang này nằm chung với chữ của mọi trang khác, ở tab{" "}
+        <strong className="text-navy">Text</strong> → khu <strong className="text-navy">About me</strong>.
+      </p>
 
       <h2 className="display mt-12 text-[22px] text-navy">
         Moments <span className="text-navy-soft">· {list.length}</span>
@@ -812,10 +811,30 @@ function About({ settings, save, uploadOne }) {
 
               <div>
                 <p className="eyebrow text-navy-soft">Photographs</p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  {(m.images || []).map((src, k) => (
-                    <Thumb key={src + k} src={src} onRemove={() => upd(i, { images: m.images.filter((_, x) => x !== k) })} />
-                  ))}
+                <div className="mt-3 flex flex-wrap items-start gap-3">
+                  {(m.images || []).map((item, k) => {
+                    const photo = asPhoto(item);
+                    return (
+                      <div key={photo.src + k} className="w-40">
+                        <Thumb
+                          src={photo.src}
+                          onRemove={() => upd(i, { images: m.images.filter((_, x) => x !== k) })}
+                        />
+                        <input
+                          value={photo.caption}
+                          onChange={(e) =>
+                            upd(i, {
+                              images: m.images.map((it, x) =>
+                                x === k ? { ...asPhoto(it), caption: e.target.value } : it
+                              ),
+                            })
+                          }
+                          placeholder="Chú thích ảnh"
+                          className="mt-2 w-full border-b border-navy/20 bg-transparent pb-1 text-[12px] text-navy outline-none focus:border-azure"
+                        />
+                      </div>
+                    );
+                  })}
                   <button
                     type="button"
                     onClick={() => inputs.current[`m${i}`]?.click()}
@@ -838,8 +857,8 @@ function About({ settings, save, uploadOne }) {
                   />
                 </div>
                 <p className="mt-2 text-[11.5px] text-navy-soft">
-                  One picture fills the width; two or three sit side by side. Click one on the site
-                  to see it full size.
+                  One picture fills the width; two or three sit side by side. The caption shows
+                  under the photograph on the page, and again when someone opens it full size.
                 </p>
               </div>
 
@@ -872,6 +891,7 @@ const EMPTY_POST = {
   excerpt: "",
   body: "",
   cover: "",
+  cover_caption: "",
   cover_x: 50,
   cover_y: 50,
   cover_zoom: 1,
@@ -880,12 +900,35 @@ const EMPTY_POST = {
   featured: false,
 };
 
+const BLOG_SQL = `create table if not exists public.blog_posts (
+  id           uuid primary key default gen_random_uuid(),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  slug         text not null unique,
+  title        text not null,
+  category     text,
+  excerpt      text,
+  body         text,
+  cover        text,
+  cover_caption text,
+  cover_x      int  default 50,
+  cover_y      int  default 50,
+  cover_zoom   real default 1,
+  published_at date,
+  published    boolean not null default true,
+  featured     boolean not null default false
+);
+alter table public.blog_posts add column if not exists cover_caption text;
+alter table public.blog_posts enable row level security;`;
+
 function Blog({ pw, settings, save, setMsg, uploadOne }) {
   const [posts, setPosts] = useState([]);
+  const [noTable, setNoTable] = useState(false);
   const [form, setForm] = useState(EMPTY_POST);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
   const [cats, setCats] = useState(settings.blog?.categories || []);
+  const [inlineCaption, setInlineCaption] = useState("");
   const coverRef = useRef(null);
   const inlineRef = useRef(null);
   const bodyRef = useRef(null);
@@ -897,16 +940,17 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
     });
     const data = await res.json().catch(() => ({}));
     if (!data.ok) {
-      /* The table is created by supabase/schema.sql — say so plainly rather
-         than showing an empty screen that looks broken. */
-      setMsg(
-        /relation|does not exist|schema/i.test(String(data.reason))
-          ? "Chưa có bảng blog_posts — chạy lại supabase/schema.sql trong Supabase một lần."
-          : data.reason || "Không tải được danh sách bài."
-      );
+      /* The table is created by supabase/schema.sql. Rather than an empty
+         screen that looks broken, show the banner with the SQL to run. */
+      if (data.reason === "no_table" || /relation|does not exist/i.test(String(data.reason))) {
+        setNoTable(true);
+      } else {
+        setMsg(data.reason || "Không tải được danh sách bài.");
+      }
       setReady(true);
       return;
     }
+    setNoTable(false);
     setPosts(data.posts || []);
     setReady(true);
   }, [pw, setMsg]);
@@ -948,12 +992,13 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
     setBusy(false);
     if (!url) return;
     const el = bodyRef.current;
-    const snippet = `\n\n![Chú thích ảnh](${url})\n\n`;
+    const snippet = `\n\n![${inlineCaption.trim()}](${url})\n\n`;
     setForm((f) => {
       const text = f.body || "";
       const at = el ? el.selectionStart : text.length;
       return { ...f, body: text.slice(0, at) + snippet + text.slice(at) };
     });
+    setInlineCaption("");
   }
 
   /* ---------------- save / edit / delete ---------------- */
@@ -969,6 +1014,11 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
     const data = await res.json();
     setBusy(false);
     if (!data.ok) {
+      if (data.reason === "no_table") {
+        setNoTable(true);
+        setMsg("Chưa tạo bảng cho blog — xem hướng dẫn ở đầu trang.");
+        return;
+      }
       setMsg(
         data.reason === "slug_taken"
           ? "Đường dẫn này đã có bài khác dùng rồi — đổi ô Đường dẫn."
@@ -990,6 +1040,7 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
       excerpt: row.excerpt || "",
       body: row.body || "",
       cover: row.cover || "",
+      cover_caption: row.cover_caption || "",
       cover_x: row.cover_x ?? 50,
       cover_y: row.cover_y ?? 50,
       cover_zoom: row.cover_zoom ?? 1,
@@ -1021,6 +1072,41 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
 
   return (
     <>
+      {noTable && (
+        <div className="mb-8 rounded-[5px] border border-azure/50 bg-paper-200 p-6">
+          <p className="text-[14px] font-semibold text-navy">
+            Chưa lưu được bài vì database chưa có bảng cho blog.
+          </p>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-navy-soft">
+            Mở <strong className="text-navy">Supabase → SQL Editor → New query</strong>, dán đoạn
+            dưới đây, bấm <strong className="text-navy">Run</strong>, rồi quay lại tải lại trang này.
+            Đoạn này chỉ tạo cái chưa có — hoạt động, cài đặt và ảnh bạn đã làm vẫn nguyên vẹn.
+          </p>
+          <pre className="mt-4 max-h-64 overflow-auto rounded-[3px] bg-navy p-4 text-[11.5px] leading-relaxed text-white">
+{BLOG_SQL}
+          </pre>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText(BLOG_SQL);
+                setMsg("Đã copy đoạn SQL.");
+              }}
+              className="rounded-full bg-navy px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-azure"
+            >
+              Copy đoạn SQL
+            </button>
+            <button
+              type="button"
+              onClick={load}
+              className="rounded-full border border-navy-line px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-soft transition hover:border-azure hover:text-azure"
+            >
+              Đã chạy xong, kiểm tra lại
+            </button>
+          </div>
+        </div>
+      )}
+
       <h1 className="display text-[30px] text-navy">
         {form.id ? "Sửa bài viết" : "Viết bài mới"}
       </h1>
@@ -1092,6 +1178,14 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
                 )}
               </div>
               <input ref={coverRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; pickCover(f); }} />
+              {form.cover && (
+                <input
+                  value={form.cover_caption}
+                  onChange={set("cover_caption")}
+                  placeholder="Chú thích ảnh bìa"
+                  className="mt-3 w-full border-b border-navy/20 bg-transparent pb-1 text-[12.5px] text-navy outline-none focus:border-azure"
+                />
+              )}
             </div>
 
             {form.cover && (
@@ -1106,11 +1200,24 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
 
         {/* ---- body ---- */}
         <div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <p className="eyebrow text-navy-soft">Nội dung bài</p>
-            <button type="button" onClick={() => inlineRef.current?.click()} disabled={busy} className="rounded-full border border-navy-line px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft transition hover:border-azure hover:text-azure disabled:opacity-50">
-              {busy ? "Đang tải…" : "Chèn ảnh vào bài"}
-            </button>
+            <div className="flex flex-1 flex-wrap items-end justify-end gap-3">
+              <label className="min-w-[200px] flex-1 md:max-w-xs">
+                <span className="block text-[10.5px] font-semibold uppercase tracking-[0.14em] text-navy-soft">
+                  Chú thích cho ảnh sắp chèn
+                </span>
+                <input
+                  value={inlineCaption}
+                  onChange={(e) => setInlineCaption(e.target.value)}
+                  placeholder="Ví dụ: Thư viện trường, tháng 3"
+                  className="mt-1 w-full border-b border-navy/20 bg-transparent pb-1 text-[12.5px] text-navy outline-none focus:border-azure"
+                />
+              </label>
+              <button type="button" onClick={() => inlineRef.current?.click()} disabled={busy} className="shrink-0 rounded-full border border-navy-line px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft transition hover:border-azure hover:text-azure disabled:opacity-50">
+                {busy ? "Đang tải…" : "Chèn ảnh vào bài"}
+              </button>
+            </div>
             <input ref={inlineRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; insertImage(f); }} />
           </div>
 
@@ -1713,6 +1820,12 @@ function TextTab({ settings, save }) {
       ui: { ...d.ui, [page]: { ...d.ui[page], [key]: e.target.value } },
     }));
 
+  const setBlogUi = (key) => (e) =>
+    setDraft((d) => ({
+      ...d,
+      blog: { ...d.blog, ui: { ...(d.blog?.ui || {}), [key]: e.target.value } },
+    }));
+
   const setContactLabel = (key) => (e) =>
     setDraft((d) => ({
       ...d,
@@ -1786,6 +1899,44 @@ function TextTab({ settings, save }) {
         <Field label="Heading above the photographs" value={draft.ui.portfolio.galleryLabel} onChange={setUi("portfolio", "galleryLabel")} />
         <Field label="Heading above the links" value={draft.ui.portfolio.linksLabel} onChange={setUi("portfolio", "linksLabel")} />
         <Field label="Close button" value={draft.ui.portfolio.closeLabel} onChange={setUi("portfolio", "closeLabel")} />
+      </div>
+
+      {/* ---------------------------------------------------------------- */}
+      <h2 className="display mt-12 text-[22px] text-navy">About me</h2>
+      <div className="mt-5 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Eyebrow" value={draft.about?.eyebrow || ""} onChange={setIn("about", "eyebrow")} />
+          <Field label="Title" value={draft.about?.title || ""} onChange={setIn("about", "title")} />
+        </div>
+        <Area label="Intro" rows={3} value={draft.about?.lead || ""} onChange={setIn("about", "lead")} />
+        <p className="text-[13px] text-navy-soft">
+          Từng mốc thời gian (năm, tiêu đề, ảnh, chú thích) nằm ở tab{" "}
+          <strong className="text-navy">About me</strong>.
+        </p>
+      </div>
+
+      {/* ---------------------------------------------------------------- */}
+      <h2 className="display mt-12 text-[22px] text-navy">Blog</h2>
+      <div className="mt-5 grid gap-6 rounded-[6px] border border-navy-line bg-white p-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Eyebrow" value={draft.blog?.eyebrow || ""} onChange={setIn("blog", "eyebrow")} />
+          <Field label="Title" value={draft.blog?.title || ""} onChange={setIn("blog", "title")} />
+        </div>
+        <Area label="Intro" rows={3} value={draft.blog?.lead || ""} onChange={setIn("blog", "lead")} />
+
+        <div className="grid gap-6 md:grid-cols-2">
+          <Field label="Nút lọc tất cả" value={draft.blog?.ui?.allLabel || ""} onChange={setBlogUi("allLabel")} />
+          <Field label="Nhãn bài nổi bật" value={draft.blog?.ui?.featuredLabel || ""} onChange={setBlogUi("featuredLabel")} />
+          <Field label="Tiêu đề nhóm bài còn lại" value={draft.blog?.ui?.moreLabel || ""} onChange={setBlogUi("moreLabel")} />
+          <Field label="Link đọc tiếp" value={draft.blog?.ui?.readMore || ""} onChange={setBlogUi("readMore")} />
+          <Field label="Link quay về danh sách" value={draft.blog?.ui?.backToList || ""} onChange={setBlogUi("backToList")} />
+          <Field label="Chữ sau số phút đọc" value={draft.blog?.ui?.minuteRead || ""} onChange={setBlogUi("minuteRead")} />
+          <Field label="Khi chuyên mục chưa có bài" value={draft.blog?.ui?.empty || ""} onChange={setBlogUi("empty")} className="md:col-span-2" />
+        </div>
+        <p className="text-[13px] text-navy-soft">
+          Danh sách chuyên mục và các bài viết nằm ở tab{" "}
+          <strong className="text-navy">Blog</strong>.
+        </p>
       </div>
 
       {/* ---------------------------------------------------------------- */}

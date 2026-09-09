@@ -9,12 +9,18 @@ import { thumbOf } from "@/lib/images";
 
 const EASE = [0.22, 1, 0.36, 1];
 
-/** 12 Aug 2026 — the way a paper dates a piece. */
+/**
+ * "20 tháng 7, 2026" — written out by hand rather than with
+ * toLocaleDateString, because the server and the browser do not always carry
+ * the same language data, and a date that differs between them breaks the page
+ * as React takes over.
+ */
 export function formatDate(value) {
   if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString("vi-VN", { day: "numeric", month: "long", year: "numeric" });
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return String(value);
+  const [, year, month, day] = match;
+  return `${Number(day)} tháng ${Number(month)}, ${year}`;
 }
 
 /**

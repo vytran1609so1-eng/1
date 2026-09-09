@@ -141,6 +141,10 @@ create index if not exists blog_posts_published_at_idx
   on public.blog_posts (published_at desc nulls last, created_at desc);
 create index if not exists blog_posts_slug_idx on public.blog_posts (slug);
 
+-- Added later, so it is applied separately for anyone who already created the
+-- table above: the caption printed under a post's cover photograph.
+alter table public.blog_posts add column if not exists cover_caption text;
+
 -- Same lock-down as the other tables: no policies, so nothing in a browser can
 -- read or write directly. The website goes through the server with the secret
 -- key, which bypasses this.
