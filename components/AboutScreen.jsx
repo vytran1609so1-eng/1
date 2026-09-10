@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import Footer from "./Footer";
 import Lightbox from "./Lightbox";
+import PhotoMosaic from "./PhotoMosaic";
 import { Reveal, Words, Orbs } from "./Motion";
-import { asPhoto, thumbOf } from "@/lib/images";
+import { asPhoto, isPlaceholder, thumbOf } from "@/lib/images";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -26,29 +27,71 @@ export default function AboutScreen({ settings }) {
   const [zoom, setZoom] = useState(null);
   const zoomPhotos = zoom ? (milestones[zoom[0]]?.images || []).map(asPhoto).filter((p) => p.src) : [];
 
+  /**
+   * Every real photograph on this page, once each, for the wall behind the
+   * title. Uploaded pictures from the site's image slots join in so the wall
+   * has enough to work with early on, and the shipped placeholders stay out —
+   * a wall of grey squares would look broken rather than deliberate.
+   */
+  const mosaicPhotos = useMemo(() => {
+    const fromMilestones = milestones.flatMap((m) => m.images || []);
+    const fromSlots = Object.values(settings.images || {});
+    const all = [...fromMilestones, ...fromSlots]
+      .map((image) => asPhoto(image).src)
+      .filter((src) => src && !isPlaceholder(src));
+    return [...new Set(all)];
+  }, [milestones, settings.images]);
+
+  /* Below a handful of pictures the wall reads as one photo repeated, which
+     looks like a mistake. Until then the header keeps its quiet original. */
+  const hasWall = mosaicPhotos.length >= 5;
+
   return (
     <main className="pt-16">
       {/* ==================== HEADER ==================== */}
-      <section className="relative overflow-hidden bg-paper pb-10 pt-16 md:pb-14 md:pt-24">
-        <Orbs />
-        <div className="wrap relative">
-          <Reveal>
-            <p className="eyebrow text-azure">{about.eyebrow}</p>
-          </Reveal>
-          <Words
-            as="h1"
-            text={about.title || "About me"}
-            className="display mt-4 block text-[clamp(2.6rem,9vw,6rem)] leading-[0.95] text-navy"
-          />
-          {about.lead && (
-            <Reveal delay={120}>
-              <p className="mt-7 max-w-2xl text-[15.5px] leading-[1.8] text-navy-soft md:text-[17px]">
-                {about.lead}
-              </p>
+      {hasWall ? (
+        <section className="relative isolate flex min-h-[clamp(380px,62vh,660px)] flex-col justify-end overflow-hidden bg-navy-deep pb-12 pt-28 md:pb-16 md:pt-36">
+          <PhotoMosaic photos={mosaicPhotos} />
+          <div className="wrap relative">
+            <Reveal>
+              <p className="eyebrow text-azure-light">{about.eyebrow}</p>
             </Reveal>
-          )}
-        </div>
-      </section>
+            <Words
+              as="h1"
+              text={about.title || "About me"}
+              className="display mt-4 block text-[clamp(2.6rem,9vw,6rem)] leading-[0.95] text-white [text-shadow:0_2px_30px_rgba(15,41,71,0.45)]"
+            />
+            {about.lead && (
+              <Reveal delay={120}>
+                <p className="mt-7 max-w-2xl text-[15.5px] leading-[1.8] text-white/85 md:text-[17px]">
+                  {about.lead}
+                </p>
+              </Reveal>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="relative overflow-hidden bg-paper pb-10 pt-16 md:pb-14 md:pt-24">
+          <Orbs />
+          <div className="wrap relative">
+            <Reveal>
+              <p className="eyebrow text-azure">{about.eyebrow}</p>
+            </Reveal>
+            <Words
+              as="h1"
+              text={about.title || "About me"}
+              className="display mt-4 block text-[clamp(2.6rem,9vw,6rem)] leading-[0.95] text-navy"
+            />
+            {about.lead && (
+              <Reveal delay={120}>
+                <p className="mt-7 max-w-2xl text-[15.5px] leading-[1.8] text-navy-soft md:text-[17px]">
+                  {about.lead}
+                </p>
+              </Reveal>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ==================== TIMELINE ==================== */}
       <section className="bg-paper pb-24 pt-6 md:pb-32">
