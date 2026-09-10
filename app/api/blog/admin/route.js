@@ -9,6 +9,56 @@ export const runtime = "nodejs";
 const missingTable = (message) =>
   /relation .*blog_posts.* does not exist|could not find the table/i.test(String(message));
 
+/**
+ * A column the table does not have — what happens when the site has been
+ * updated but the one-line `alter table … add column` was never run. The
+ * message names the column, e.g.
+ *   Could not find the 'cover_caption' column of 'blog_posts' in the schema cache
+ *   column "cover_caption" of relation "blog_posts" does not exist
+ * We pull the name out so the save can drop that one field and go through
+ * anyway: losing a caption is much better than losing the whole post.
+ */
+function missingColumn(message) {
+  const text = String(message ?? "");
+  const found =
+    text.match(/could not find the '([^']+)' column/i) ||
+    text.match(/column "([^"]+)" of relation/i) ||
+    text.match(/column ([a-z_]+) does not exist/i);
+  return found ? found[1] : null;
+}
+
+/**
+ * Run a write, and if the database turns out to be missing a column, drop that
+ * column and try again. Bounded to a few attempts so a genuine failure still
+ * surfaces. Returns the columns that had to be dropped, so the admin can say
+ * which one-line SQL brings the feature back.
+ */
+async function writeTolerantly(run, data) {
+  const payload = { ...data };
+  const dropped = [];
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const result = await run(payload);
+    if (!result.error) return { ...result, dropped };
+
+    const column = missingColumn(result.error.message);
+    if (!column || !(column in payload)) return { ...result, dropped };
+
+    delete payload[column];
+    dropped.push(column);
+  }
+
+  return { data: null, error: { message: "too_many_missing_columns" }, dropped };
+}
+
+/** Turn a Supabase error into something the admin can act on. */
+const reasonFor = (error) =>
+  missingTable(error.message)
+    ? "no_table"
+    : /duplicate|unique/i.test(error.message)
+    ? "slug_taken"
+    : error.message;
+
 const guard = (request) => {
   if (!isConfigured())
     return NextResponse.json({ ok: false, reason: "not_configured" }, { status: 503 });
@@ -73,22 +123,15 @@ export async function POST(request) {
   const { data, error: bad } = clean(payload);
   if (bad) return NextResponse.json({ ok: false, reason: bad }, { status: 400 });
 
-  const { data: row, error } = await getSupabase()
-    .from(POSTS_TABLE)
-    .insert(data)
-    .select()
-    .single();
+  const { data: row, error, dropped } = await writeTolerantly(
+    (fields) => getSupabase().from(POSTS_TABLE).insert(fields).select().single(),
+    data
+  );
 
-  if (error) {
-    // The two mistakes worth explaining properly rather than in Postgres-speak.
-    const reason = missingTable(error.message)
-      ? "no_table"
-      : /duplicate|unique/i.test(error.message)
-      ? "slug_taken"
-      : error.message;
-    return NextResponse.json({ ok: false, reason }, { status: 500 });
-  }
-  return NextResponse.json({ ok: true, post: row });
+  if (error)
+    return NextResponse.json({ ok: false, reason: reasonFor(error) }, { status: 500 });
+
+  return NextResponse.json({ ok: true, post: row, dropped });
 }
 
 /* Update ----------------------------------------------------------------- */
@@ -114,16 +157,15 @@ export async function PATCH(request) {
   const { data, error: bad } = clean(payload);
   if (bad) return NextResponse.json({ ok: false, reason: bad }, { status: 400 });
 
-  const { error } = await getSupabase().from(POSTS_TABLE).update(data).eq("id", id);
-  if (error) {
-    const reason = missingTable(error.message)
-      ? "no_table"
-      : /duplicate|unique/i.test(error.message)
-      ? "slug_taken"
-      : error.message;
-    return NextResponse.json({ ok: false, reason }, { status: 500 });
-  }
-  return NextResponse.json({ ok: true });
+  const { error, dropped } = await writeTolerantly(
+    (fields) => getSupabase().from(POSTS_TABLE).update(fields).eq("id", id),
+    data
+  );
+
+  if (error)
+    return NextResponse.json({ ok: false, reason: reasonFor(error) }, { status: 500 });
+
+  return NextResponse.json({ ok: true, dropped });
 }
 
 /* Delete ----------------------------------------------------------------- */

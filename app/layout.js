@@ -8,8 +8,11 @@ import { Analytics } from "@vercel/analytics/next";
 import { getSettings } from "@/lib/data";
 
 export const metadata = {
-  // TODO: change to your real domain once you have one
-  metadataBase: new URL("https://example.com"),
+  /* The address the site actually lives at. Everything that gets shared —
+     the preview card on Facebook, LinkedIn, Messenger and Zalo, and every
+     link a search engine prints — is built from this. Change it here if the
+     project is ever renamed or moved onto a domain of its own. */
+  metadataBase: new URL("https://tranvy.vercel.app"),
   title: {
     default: "Tran Thi Thuy Vy — Fintech Portfolio",
     template: "%s · Tran Thi Thuy Vy",
