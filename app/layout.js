@@ -3,6 +3,7 @@ import SiteProvider from "@/components/SiteProvider";
 import SmoothScroll from "@/components/SmoothScroll";
 import Cursor from "@/components/Cursor";
 import Nav from "@/components/Nav";
+import ViewTracker from "@/components/ViewTracker";
 import EditPanel from "@/components/EditPanel";
 import { Analytics } from "@vercel/analytics/next";
 import { getSettings } from "@/lib/data";
@@ -57,6 +58,9 @@ export default async function RootLayout({ children }) {
           <Nav signature={settings.profile.signature} />
           {children}
           <EditPanel />
+          {/* Records that a page was opened. Nothing about the reader is stored —
+              see components/ViewTracker.jsx. */}
+          <ViewTracker />
         </SiteProvider>
         {/* Vercel Web Analytics — how many people visit, and which pages they
             read. No cookies, no personal data. Switch it on once in Vercel:
