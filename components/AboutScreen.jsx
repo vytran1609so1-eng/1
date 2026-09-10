@@ -114,6 +114,7 @@ export default function AboutScreen({ settings }) {
                   milestone={m}
                   index={i}
                   showYear={i === 0 || milestones[i - 1]?.year !== m.year}
+                  about={about}
                   onZoom={(imageIndex) => setZoom([i, imageIndex])}
                 />
               ))}
@@ -135,7 +136,7 @@ export default function AboutScreen({ settings }) {
   );
 }
 
-function Milestone({ milestone, index, showYear, onZoom }) {
+function Milestone({ milestone, index, showYear, onZoom, about = {} }) {
   const reduce = useReducedMotion();
   const photos = (milestone.images || []).map(asPhoto).filter((p) => p.src);
 
@@ -168,9 +169,12 @@ function Milestone({ milestone, index, showYear, onZoom }) {
           </h2>
         )}
         {milestone.text && (
-          <p className="mt-3 max-w-2xl text-[15px] leading-[1.8] text-navy-soft md:text-[16px]">
-            {milestone.text}
-          </p>
+          <Prose
+            text={milestone.text}
+            reduce={reduce}
+            readMore={about.readMore}
+            readLess={about.readLess}
+          />
         )}
 
         {photos.length > 0 && (
@@ -211,5 +215,78 @@ function Milestone({ milestone, index, showYear, onZoom }) {
         )}
       </div>
     </motion.article>
+  );
+}
+
+
+/* How many paragraphs are shown before the "read more" appears. Two is enough
+   to tell whether you want the rest, and short enough that ten milestones in a
+   row still read as a timeline rather than as an essay. */
+const PREVIEW = 2;
+
+/**
+ * A long piece of writing, made comfortable to read.
+ *
+ * Three things happen here, and each answers a real problem with long text on
+ * a timeline:
+ *
+ *  · Line breaks survive. A blank line in the admin becomes a new paragraph;
+ *    a single newline stays a line break inside one. Typing a story into the
+ *    box and having it come out as one grey slab is the usual disappointment,
+ *    and `whitespace-pre-line` is what prevents it.
+ *
+ *  · Each paragraph arrives as you reach it, rather than the whole block
+ *    landing at once — you read down the page and the words meet you there.
+ *
+ *  · Anything past the second paragraph stays folded until asked for. A
+ *    timeline is a list of moments; if every moment printed six paragraphs the
+ *    shape of the timeline would be lost. Opening one pushes nothing else
+ *    around except what is below it.
+ */
+function Prose({ text, reduce, readMore = "Đọc tiếp", readLess = "Thu gọn" }) {
+  const [open, setOpen] = useState(false);
+
+  /* Split on blank lines. Everything else — single newlines inside a
+     paragraph — is left to whitespace-pre-line to render. */
+  const paragraphs = String(text)
+    .split(/\n\s*\n/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const foldable = paragraphs.length > PREVIEW + 1;
+  const shown = foldable && !open ? paragraphs.slice(0, PREVIEW) : paragraphs;
+
+  return (
+    <div className="mt-3 max-w-2xl">
+      {shown.map((paragraph, i) => (
+        <motion.p
+          key={i}
+          className="whitespace-pre-line text-[15px] leading-[1.85] text-navy-soft [&+&]:mt-4 md:text-[16px]"
+          initial={reduce ? false : { opacity: 0, y: 14 }}
+          whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.35 }}
+          transition={{ duration: 0.6, ease: EASE, delay: Math.min(i * 0.05, 0.3) }}
+        >
+          {paragraph}
+        </motion.p>
+      ))}
+
+      {foldable && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="group mt-4 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-azure transition-colors hover:text-navy"
+        >
+          {open ? readLess : `${readMore} (${paragraphs.length - PREVIEW})`}
+          <span
+            aria-hidden="true"
+            className={`transition-transform duration-300 ${open ? "rotate-180" : "group-hover:translate-y-0.5"}`}
+          >
+            ↓
+          </span>
+        </button>
+      )}
+    </div>
   );
 }
