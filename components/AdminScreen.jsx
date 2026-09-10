@@ -6,6 +6,7 @@ import { IMAGE_GROUPS, IMAGE_SLOTS, isPlaceholder, asPhoto } from "@/lib/images"
 import { KEYWORD_IDS } from "@/lib/content";
 import { shrinkImage, makeThumb } from "@/lib/resize-image";
 import { slugify } from "@/lib/slug";
+import Views from "./AdminViews";
 
 const PW_KEY = "vy-admin-pw";
 
@@ -34,6 +35,7 @@ const TABS = [
   ["numbers", "Numbers"],
   ["images", "Images"],
   ["text", "Text"],
+  ["views", "Lượt xem"],
 ];
 
 export default function AdminScreen() {
@@ -312,6 +314,7 @@ export default function AdminScreen() {
           <Images settings={settings} save={saveSettings} uploadOne={uploadOne} />
         )}
         {tab === "text" && <TextTab settings={settings} save={saveSettings} />}
+        {tab === "views" && <Views pw={pw} setMsg={setMsg} />}
       </div>
     </main>
   );
