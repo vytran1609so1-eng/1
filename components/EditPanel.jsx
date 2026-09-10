@@ -167,7 +167,10 @@ export default function EditPanel() {
           </p>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        {/* data-lenis-prevent: see the note in EntryModal — without it the
+            smooth-scroll engine swallows the wheel and this panel cannot be
+            scrolled. */}
+        <div data-lenis-prevent className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
           <div className="mb-5 space-y-4">
             {IMAGE_GROUPS.map((group) => (
               <div key={group.name}>

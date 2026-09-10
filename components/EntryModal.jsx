@@ -102,8 +102,23 @@ export default function EntryModal({ entry, categoryLabel = "", onClose }) {
               </button>
             </div>
 
-            {/* Body */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-7 md:px-9 md:py-9">
+            {/*
+              Body.
+
+              `data-lenis-prevent` is what lets the wheel work in here. Lenis
+              listens for wheel events on the whole document and calls
+              preventDefault on them — that is how smooth scrolling works — and
+              it keeps doing so even after `stop()`, which is what the panel
+              calls when it opens. Without this attribute the wheel does
+              nothing at all inside the panel: the page is locked and the panel
+              never sees the event. Lenis looks for the attribute anywhere in
+              the event's path and steps aside when it finds one, handing the
+              element back its ordinary native scrolling.
+            */}
+            <div
+              data-lenis-prevent
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-7 md:px-9 md:py-9"
+            >
               {entry.body && (
                 <p className="max-w-2xl whitespace-pre-line text-[15.5px] leading-[1.85] text-navy">
                   {entry.body}

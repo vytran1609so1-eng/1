@@ -930,12 +930,54 @@ const BLOG_SQL = `create table if not exists public.blog_posts (
   published    boolean not null default true,
   featured     boolean not null default false
 );
+alter table public.blog_posts add column if not exists category      text;
+alter table public.blog_posts add column if not exists excerpt       text;
+alter table public.blog_posts add column if not exists body          text;
+alter table public.blog_posts add column if not exists cover         text;
 alter table public.blog_posts add column if not exists cover_caption text;
+alter table public.blog_posts add column if not exists cover_x       int  default 50;
+alter table public.blog_posts add column if not exists cover_y       int  default 50;
+alter table public.blog_posts add column if not exists cover_zoom    real default 1;
+alter table public.blog_posts add column if not exists published_at  date;
+alter table public.blog_posts add column if not exists published     boolean not null default true;
+alter table public.blog_posts add column if not exists featured      boolean not null default false;
 alter table public.blog_posts enable row level security;`;
+
+/* The type each blog column should have, so a missing one can be added with a
+   single correct line rather than a guess. */
+const BLOG_COLUMN_TYPES = {
+  category: "text",
+  excerpt: "text",
+  body: "text",
+  cover: "text",
+  cover_caption: "text",
+  cover_x: "integer default 50",
+  cover_y: "integer default 50",
+  cover_zoom: "numeric default 1",
+  published_at: "date",
+  published: "boolean not null default true",
+  featured: "boolean not null default false",
+  updated_at: "timestamptz default now()",
+};
+
+/** The exact SQL that adds back whichever columns the database is missing. */
+const alterSql = (columns) =>
+  columns
+    .map(
+      (name) =>
+        `alter table public.blog_posts add column if not exists ${name} ${
+          BLOG_COLUMN_TYPES[name] || "text"
+        };`
+    )
+    .join("\n");
 
 function Blog({ pw, settings, save, setMsg, uploadOne }) {
   const [posts, setPosts] = useState([]);
   const [noTable, setNoTable] = useState(false);
+  /* Columns the database turned out not to have. The post still saves — only
+     those fields could not be stored, and the banner below gives the one line
+     of SQL that brings them back. */
+  const [missingCols, setMissingCols] = useState([]);
   const [form, setForm] = useState(EMPTY_POST);
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
@@ -1038,8 +1080,16 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
       );
       return;
     }
+    const dropped = data.dropped || [];
+    setMissingCols(dropped);
     setForm(EMPTY_POST);
-    setMsg(form.id ? "Đã cập nhật bài viết." : "Đã đăng bài.");
+    setMsg(
+      dropped.length
+        ? "Đã lưu bài — nhưng database thiếu vài cột, xem hướng dẫn ở đầu trang."
+        : form.id
+        ? "Đã cập nhật bài viết."
+        : "Đã đăng bài."
+    );
     load();
   }
 
@@ -1114,6 +1164,42 @@ function Blog({ pw, settings, save, setMsg, uploadOne }) {
               className="rounded-full border border-navy-line px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-soft transition hover:border-azure hover:text-azure"
             >
               Đã chạy xong, kiểm tra lại
+            </button>
+          </div>
+        </div>
+      )}
+
+      {missingCols.length > 0 && (
+        <div className="mb-8 rounded-[5px] border border-azure/50 bg-paper-200 p-6">
+          <p className="text-[14px] font-semibold text-navy">
+            Bài đã lưu, nhưng database còn thiếu {missingCols.length} cột.
+          </p>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-navy-soft">
+            Bảng blog của bạn được tạo từ bản cũ nên chưa có{" "}
+            <strong className="text-navy">{missingCols.join(", ")}</strong>. Nội dung bài vẫn được
+            cất giữ đầy đủ — chỉ riêng mấy ô đó chưa lưu được. Chạy đoạn dưới trong{" "}
+            <strong className="text-navy">Supabase → SQL Editor</strong> là xong, không mất gì cả.
+          </p>
+          <pre className="mt-4 overflow-auto rounded-[3px] bg-navy p-4 text-[11.5px] leading-relaxed text-white">
+{alterSql(missingCols)}
+          </pre>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText(alterSql(missingCols));
+                setMsg("Đã copy đoạn SQL.");
+              }}
+              className="rounded-full bg-navy px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition hover:bg-azure"
+            >
+              Copy đoạn SQL
+            </button>
+            <button
+              type="button"
+              onClick={() => setMissingCols([])}
+              className="rounded-full border border-navy-line px-5 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-navy-soft transition hover:border-azure hover:text-azure"
+            >
+              Đã chạy xong, ẩn đi
             </button>
           </div>
         </div>
