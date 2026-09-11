@@ -37,6 +37,23 @@ const PAGE_NAMES = {
 
 const nf = new Intl.NumberFormat("vi-VN");
 
+/* The contact links, in the words Vy would use for them. */
+const LINK_NAMES = {
+  email: "Email",
+  phone: "Số điện thoại",
+  linkedin: "LinkedIn",
+  facebook: "Facebook",
+};
+
+/** 95 → "1 phút 35 giây" — seconds alone stop being readable past a minute. */
+function formatSeconds(total) {
+  if (total == null) return "—";
+  if (total < 60) return `${total} giây`;
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return s ? `${m} phút ${s} giây` : `${m} phút`;
+}
+
 function formatDate(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -79,6 +96,8 @@ export default function Views({ pw, setMsg }) {
   const { postRows, pageRows } = useMemo(() => {
     if (!data) return { postRows: [], pageRows: [] };
     const titles = new Map((data.posts || []).map((p) => [p.slug, p]));
+    const reading = new Map((data.reading || []).map((r) => [r.path, r]));
+    const depth = new Map((data.depth || []).map((d) => [d.path, d]));
     const postRows = [];
     const pageRows = [];
 
@@ -88,13 +107,19 @@ export default function Views({ pw, setMsg }) {
         const post = titles.get(slug);
         postRows.push({
           ...row,
+          avgSeconds: reading.get(row.path)?.avgSeconds ?? null,
+          avgDepth: depth.get(row.path)?.avg ?? null,
           title: post?.title || slug,
           slug,
           draft: post ? post.published === false : false,
           missing: !post,
         });
       } else {
-        pageRows.push({ ...row, name: PAGE_NAMES[row.path] || row.path });
+        pageRows.push({
+          ...row,
+          name: PAGE_NAMES[row.path] || row.path,
+          avgDepth: depth.get(row.path)?.avg ?? null,
+        });
       }
     }
     return { postRows, pageRows };
@@ -270,6 +295,13 @@ export default function Views({ pw, setMsg }) {
         title="Bài viết trên blog"
         empty="Chưa có bài nào được mở."
         rows={[...postRows, ...unreadPosts]}
+        extra={[
+          { head: "Đọc trung bình", cell: (row) => formatSeconds(row.avgSeconds) },
+          {
+            head: "Cuộn tới",
+            cell: (row) => (row.avgDepth == null ? "—" : `${row.avgDepth}%`),
+          },
+        ]}
         renderName={(row) => (
           <>
             <span className="text-navy">{row.title}</span>
@@ -288,11 +320,97 @@ export default function Views({ pw, setMsg }) {
         )}
       />
 
+      {/* ------------------------- sections reached ---------------------- */}
+      {data.sections?.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft">
+            Người đọc tới được section nào
+          </h2>
+          <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-navy-soft">
+            Tính trên số người đã mở trang chứa section đó. Một section chỉ được đếm khi đã hiện
+            được một phần ba trên màn hình — lướt vụt qua không tính là đã đọc.
+          </p>
+          <div className="mt-4 grid gap-3">
+            {data.sections.map((row) => (
+              <div key={`${row.path}-${row.label}`} className="rounded-[6px] border border-navy-line bg-white px-5 py-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <span className="text-[14px] text-navy">{row.label}</span>
+                  <span className="text-[13px] tabular-nums text-navy-soft">
+                    {nf.format(row.count)}
+                    {row.of ? ` / ${nf.format(row.of)}` : ""}
+                    {row.percent != null && (
+                      <strong className="ml-2 text-navy">{row.percent}%</strong>
+                    )}
+                  </span>
+                </div>
+                <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-paper-300">
+                  <div
+                    className="h-full rounded-full bg-azure"
+                    style={{ width: `${Math.min(100, row.percent ?? 0)}%` }}
+                  />
+                </div>
+                <p className="mt-1.5 text-[11.5px] text-navy-soft">{row.path}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* -------------------------- activities opened -------------------- */}
+      {data.entries?.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft">
+            Hoạt động được mở ra đọc
+          </h2>
+          <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-navy-soft">
+            Ai đó phải bấm vào mới được tính. Đây là con số nói nhiều nhất về việc người xem thực
+            sự quan tâm hoạt động nào của bạn.
+          </p>
+          <div className="mt-4 overflow-x-auto rounded-[6px] border border-navy-line bg-white">
+            <table className="w-full min-w-[420px] border-collapse text-[14px]">
+              <tbody>
+                {data.entries.map((row) => (
+                  <tr key={row.label} className="border-b border-navy-line/60 last:border-b-0">
+                    <td className="px-5 py-3.5 text-navy">{row.label}</td>
+                    <td className="w-28 px-5 py-3.5 text-right tabular-nums font-semibold text-navy">
+                      {nf.format(row.count)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* --------------------------- contact clicks ---------------------- */}
+      {data.links?.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft">
+            Lượt bấm vào thông tin liên hệ
+          </h2>
+          <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-navy-soft">
+            Thước đo gần nhất với câu hỏi “trang web này có hiệu quả không”.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+            {data.links.map((row) => (
+              <Stat key={row.label} label={LINK_NAMES[row.label] || row.label} value={row.count} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* ------------------------------ pages ---------------------------- */}
       <Table
         title="Các trang khác"
         empty="Chưa có trang nào được mở."
         rows={pageRows}
+        extra={[
+          {
+            head: "Cuộn tới",
+            cell: (row) => (row.avgDepth == null ? "—" : `${row.avgDepth}%`),
+          },
+        ]}
         renderName={(row) => (
           <>
             <span className="text-navy">{row.name}</span>
@@ -333,7 +451,12 @@ function Stat({ label, value, text, big = false }) {
   );
 }
 
-function Table({ title, rows, empty, renderName }) {
+/**
+ * `extra` adds columns before the counts — used by the blog table for how long
+ * a post is read and how far down it people get, which say far more about a
+ * post than the number of times it was opened.
+ */
+function Table({ title, rows, empty, renderName, extra = [] }) {
   return (
     <section className="mt-10">
       <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-navy-soft">
@@ -348,6 +471,11 @@ function Table({ title, rows, empty, renderName }) {
             <thead>
               <tr className="border-b border-navy-line text-[11px] uppercase tracking-[0.1em] text-navy-soft">
                 <th className="px-5 py-3.5 text-left font-semibold">Trang</th>
+                {extra.map((col) => (
+                  <th key={col.head} className="w-32 px-5 py-3.5 text-right font-semibold">
+                    {col.head}
+                  </th>
+                ))}
                 <th className="w-24 px-5 py-3.5 text-right font-semibold">7 ngày</th>
                 <th className="w-24 px-5 py-3.5 text-right font-semibold">30 ngày</th>
                 <th className="w-28 px-5 py-3.5 text-right font-semibold">Tổng</th>
@@ -357,6 +485,14 @@ function Table({ title, rows, empty, renderName }) {
               {rows.map((row) => (
                 <tr key={row.path} className="border-b border-navy-line/60 last:border-b-0">
                   <td className="px-5 py-3.5">{renderName(row)}</td>
+                  {extra.map((col) => (
+                    <td
+                      key={col.head}
+                      className="px-5 py-3.5 text-right tabular-nums text-navy-soft"
+                    >
+                      {col.cell(row)}
+                    </td>
+                  ))}
                   <td className="px-5 py-3.5 text-right tabular-nums text-navy-soft">
                     {nf.format(row.last7)}
                   </td>

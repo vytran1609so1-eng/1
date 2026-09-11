@@ -8,6 +8,7 @@ import EntryModal from "./EntryModal";
 import { CountUp } from "./Motion";
 import { useSite } from "./SiteProvider";
 import { entryPhotos } from "@/lib/images";
+import { track } from "@/lib/track";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -25,7 +26,15 @@ export default function EntryList({ groups, showCategoryOnCard = true, categorie
   return (
     <>
       {groups.map((group, gi) => (
-        <section key={group.id ?? gi} className={gi > 0 ? "mt-16 md:mt-24" : ""}>
+        <section
+          key={group.id ?? gi}
+          /* Read by ViewTracker: it reports the first time a section is
+             actually on screen, which is how "people stop before Work
+             Experience" becomes something you can see rather than guess. */
+          data-track-section={group.id ?? `section-${gi}`}
+          data-track-label={group.label || group.id || `section-${gi}`}
+          className={gi > 0 ? "mt-16 md:mt-24" : ""}
+        >
           {group.label && (
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-b-2 border-navy pb-4">
               <h2 className="display text-[26px] text-navy md:text-[34px]">{group.label}</h2>
@@ -73,7 +82,13 @@ export default function EntryList({ groups, showCategoryOnCard = true, categorie
                     <EntryCard
                       entry={entry}
                       categoryLabel={showCategoryOnCard ? labelOf(entry.category) : null}
-                      onOpen={() => setOpen(entry)}
+                      onOpen={() => {
+                        /* Which activity someone cared enough to open is the
+                           most telling number on the whole site — far more
+                           than how many people landed on the page. */
+                        track("entry", { label: entry.title });
+                        setOpen(entry);
+                      }}
                     />
                   </motion.div>
                 ))}
