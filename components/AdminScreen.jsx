@@ -458,6 +458,22 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
    * which is the moment it stops inheriting — so ticking a second keyword
    * never silently drops the first.
    */
+  /**
+   * Move a whole section up or down.
+   *
+   * The same control also lives in Sections & keywords, but this is the screen
+   * where the sections are actually laid out in front of you — so this is
+   * where you notice that Work Experience belongs higher up, and it should not
+   * mean going to find another tab.
+   */
+  function moveSectionHere(index, delta) {
+    const cats = [...(settings.categories || [])];
+    const to = index + delta;
+    if (to < 0 || to >= cats.length) return;
+    [cats[index], cats[to]] = [cats[to], cats[index]];
+    saveSettings({ ...settings, categories: cats, categoryOrder: cats.map((c) => c.id) });
+  }
+
   function keywordsOf(row) {
     const chosen = (settings.entryKeywords || {})[row.id];
     if (Array.isArray(chosen)) return chosen;
@@ -675,18 +691,42 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
         Your library <span className="text-navy-soft">· {entries.length}</span>
       </h2>
       <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-navy-soft">
-        Grouped the way the portfolio groups them. The ↑ ↓ buttons set the running order inside a
-        section and save straight away — no need to press anything else. Activities you have never
-        moved stay in date order, newest first, below the ones you have arranged.
+        Grouped the way the portfolio groups them. The ↑ ↓ buttons <strong className="text-navy">next
+        to a section title</strong> move that whole section up or down the portfolio; the ones{" "}
+        <strong className="text-navy">beside an activity</strong> set the order inside its section.
+        Both save straight away. Activities you have never moved stay in date order, newest first,
+        below the ones you have arranged.
       </p>
 
       {entries.length === 0 ? (
         <p className="mt-4 text-[14px] text-navy-soft">Nothing in the database yet.</p>
       ) : (
-        grouped.map((group) => (
+        grouped.map((group, gi) => (
           <section key={group.id} className="mt-10">
             <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-navy-line pb-2">
-              <h3 className="display text-[20px] text-navy">
+              <h3 className="flex items-center gap-3 display text-[20px] text-navy">
+                <span className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => moveSectionHere(gi, -1)}
+                    disabled={gi === 0}
+                    aria-label={`Đưa ${group.label} lên trên`}
+                    title="Đưa cả section này lên trên"
+                    className="grid h-7 w-7 place-items-center rounded-full border border-navy/25 text-[13px] text-navy transition hover:border-azure hover:text-azure disabled:opacity-25"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveSectionHere(gi, 1)}
+                    disabled={gi === grouped.length - 1}
+                    aria-label={`Đưa ${group.label} xuống dưới`}
+                    title="Đưa cả section này xuống dưới"
+                    className="grid h-7 w-7 place-items-center rounded-full border border-navy/25 text-[13px] text-navy transition hover:border-azure hover:text-azure disabled:opacity-25"
+                  >
+                    ↓
+                  </button>
+                </span>
                 {group.label} <span className="text-navy-soft">· {group.rows.length}</span>
               </h3>
               {(settings.entryOrder || {})[group.id] && (
@@ -754,6 +794,9 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
                         <button type="button" onClick={() => toggle(row, "published")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
                           {row.published ? "Visible" : "Hidden"}
                         </button>
+                        <button type="button" onClick={() => remove(row)} className="rounded-full border border-azure/40 px-3 py-1.5 text-azure transition hover:bg-azure hover:text-white">
+                          Delete
+                        </button>
                       </div>
 
                       {/* Which keyword pages this activity appears on. An
@@ -793,9 +836,6 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
                             theo chuyên mục
                           </span>
                         )}
-                        <button type="button" onClick={() => remove(row)} className="rounded-full border border-azure/40 px-3 py-1.5 text-azure transition hover:bg-azure hover:text-white">
-                          Delete
-                        </button>
                       </div>
                     </div>
                   </article>
