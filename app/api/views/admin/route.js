@@ -51,8 +51,15 @@ export async function GET(request) {
   const links = new Map();      // email/linkedin/…   -> count
   const depth = new Map();      // path -> { sum, n }
   const reading = new Map();    // post path -> { sum, n }
+  /* Counted separately from `rows.length`, which is every measurement in the
+     table — page views plus sections reached, activities opened, contact
+     clicks, scroll depths and reading times. Those extra rows are why the
+     total once read higher than the 30-day figure: the total was counting all
+     of them while the periods counted only views. A "view" is a view. */
+  let totalViews = 0;
   let last7 = 0;
   let last30 = 0;
+  let oldestView = null;
   /* Views per day for the last 30 days, oldest first — enough for a small bar
      chart without sending 100,000 timestamps to the browser. */
   const perDay = new Map();
@@ -92,6 +99,9 @@ export async function GET(request) {
     if (at >= since30) entry.last30 += 1;
     byPath.set(path, entry);
 
+    totalViews += 1;
+    oldestView = row.created_at;
+
     if (at >= since7) last7 += 1;
     if (at >= since30) {
       last30 += 1;
@@ -130,10 +140,15 @@ export async function GET(request) {
 
   return NextResponse.json({
     ok: true,
-    total: rows.length,
+    total: totalViews,
+    /* Everything else recorded — kept separate so the two can never be
+       confused with each other again. */
+    events: rows.length - totalViews,
     last7,
     last30,
-    firstSeen: rows.length ? rows[rows.length - 1].created_at : null,
+    /* Rows arrive newest first, so the last view seen in the loop is the
+       oldest one — the day counting actually began. */
+    firstSeen: oldestView,
     pages,
     posts,
     sections: sectionRows,
