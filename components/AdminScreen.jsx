@@ -450,6 +450,32 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
   }, [entries, settings]);
 
   /** Move one activity up or down inside its section and save immediately. */
+  /**
+   * Which keyword pages one activity appears on.
+   *
+   * Untouched activities are not listed at all, and go on inheriting their
+   * section's keyword. The first tick writes the full list for that activity,
+   * which is the moment it stops inheriting — so ticking a second keyword
+   * never silently drops the first.
+   */
+  function keywordsOf(row) {
+    const chosen = (settings.entryKeywords || {})[row.id];
+    if (Array.isArray(chosen)) return chosen;
+    const section = (settings.categories || []).find((c) => c.id === row.category);
+    return section?.keyword ? [section.keyword] : [];
+  }
+
+  function toggleKeyword(row, keywordId) {
+    const current = keywordsOf(row);
+    const next = current.includes(keywordId)
+      ? current.filter((k) => k !== keywordId)
+      : [...current, keywordId];
+    saveSettings({
+      ...settings,
+      entryKeywords: { ...(settings.entryKeywords || {}), [row.id]: next },
+    });
+  }
+
   function moveEntry(categoryId, rows, index, dir) {
     const target = index + dir;
     if (target < 0 || target >= rows.length) return;
@@ -728,6 +754,45 @@ function Activities({ pw, entries, settings, reload, setMsg, uploadOne, saveSett
                         <button type="button" onClick={() => toggle(row, "published")} className="rounded-full border border-navy/30 px-3 py-1.5 text-navy-soft transition hover:border-azure hover:text-azure">
                           {row.published ? "Visible" : "Hidden"}
                         </button>
+                      </div>
+
+                      {/* Which keyword pages this activity appears on. An
+                          activity can sit under two at once — the same piece of
+                          work often is both. */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-navy-soft">
+                          Keywords
+                        </span>
+                        {(settings.keywords || []).map((k) => {
+                          const on = keywordsOf(row).includes(k.id);
+                          const inherited = !Array.isArray((settings.entryKeywords || {})[row.id]);
+                          return (
+                            <button
+                              key={k.id}
+                              type="button"
+                              onClick={() => toggleKeyword(row, k.id)}
+                              title={
+                                inherited
+                                  ? `Đang theo chuyên mục. Bấm để chọn riêng cho hoạt động này.`
+                                  : on
+                                  ? `Đang hiện ở trang ${k.word}`
+                                  : `Không hiện ở trang ${k.word}`
+                              }
+                              className={`rounded-full border px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] transition ${
+                                on
+                                  ? "border-azure bg-azure text-white"
+                                  : "border-navy/20 text-navy-soft hover:border-azure hover:text-azure"
+                              } ${inherited ? "opacity-70" : ""}`}
+                            >
+                              {k.word}
+                            </button>
+                          );
+                        })}
+                        {!Array.isArray((settings.entryKeywords || {})[row.id]) && (
+                          <span className="text-[10.5px] italic text-navy-soft">
+                            theo chuyên mục
+                          </span>
+                        )}
                         <button type="button" onClick={() => remove(row)} className="rounded-full border border-azure/40 px-3 py-1.5 text-azure transition hover:bg-azure hover:text-white">
                           Delete
                         </button>
@@ -1440,6 +1505,18 @@ function Sections({ settings, save }) {
       keywords: d.keywords.map((k, j) => (j === i ? { ...k, ...patch } : k)),
     }));
 
+  /* The sections are printed on the portfolio in this order. Moving one writes
+     the whole list, so the order stops depending on keywords from then on. */
+  const moveSection = (i, delta) =>
+    setDraft((d) => {
+      const ids = d.categories.map((c) => c.id);
+      const to = i + delta;
+      if (to < 0 || to >= ids.length) return d;
+      const cats = [...d.categories];
+      [cats[i], cats[to]] = [cats[to], cats[i]];
+      return { ...d, categories: cats, categoryOrder: cats.map((c) => c.id) };
+    });
+
   return (
     <>
       <h1 className="display text-[30px] text-navy">Sections & keywords</h1>
@@ -1461,10 +1538,38 @@ function Sections({ settings, save }) {
       </div>
 
       <h2 className="display mt-12 text-[22px] text-navy">Sections</h2>
+      <p className="mt-2 max-w-2xl text-[13.5px] leading-relaxed text-navy-soft">
+        Thứ tự bên dưới chính là thứ tự các section hiện trên trang Hồ sơ. Dùng ↑ ↓ để đổi — ví dụ
+        đưa Work Experience lên ngay dưới Academic. Chưa đụng tới thì các section tự xếp theo từ khoá.
+      </p>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         {draft.categories.map((c, i) => (
           <div key={c.id} className="rounded-[5px] border border-navy-line bg-white p-5">
-            <p className="eyebrow text-navy-soft">{c.id}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="eyebrow text-navy-soft">
+                {i + 1} · {c.id}
+              </p>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => moveSection(i, -1)}
+                  disabled={i === 0}
+                  aria-label="Lên trên"
+                  className="grid h-7 w-7 place-items-center rounded-full border border-navy/25 text-navy transition hover:border-azure hover:text-azure disabled:opacity-25"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSection(i, 1)}
+                  disabled={i === draft.categories.length - 1}
+                  aria-label="Xuống dưới"
+                  className="grid h-7 w-7 place-items-center rounded-full border border-navy/25 text-navy transition hover:border-azure hover:text-azure disabled:opacity-25"
+                >
+                  ↓
+                </button>
+              </div>
+            </div>
             <Field label="Name" value={c.label} onChange={(e) => upd(i, { label: e.target.value })} />
             <Area label="Description" rows={2} value={c.blurb} onChange={(e) => upd(i, { blurb: e.target.value })} className="mt-4" />
             <Select label="Belongs to keyword" value={c.keyword || ""} onChange={(e) => upd(i, { keyword: e.target.value })} className="mt-4">

@@ -12,6 +12,8 @@ import { useSite } from "./SiteProvider";
 export default function HomeScreen({ settings }) {
   const { ui } = useSite();
   const { profile, home, keywords } = settings;
+  const about = settings.about || {};
+  const blog = settings.blog || {};
   const ref = useRef(null);
   const reduce = useReducedMotion();
 
@@ -149,6 +151,73 @@ export default function HomeScreen({ settings }) {
       <FeatureBands bands={settings.bands} page="home" />
 
       {/* ==================== THREE KEYWORDS ==================== */}
+
+      {/* ==================== TWO MORE DOORS ==================== */}
+      {/*
+        The portfolio answers "what has she done". These two answer the other
+        two questions a reader ends up with — who is she, and how does she
+        think — and until now both pages were only reachable from the
+        navigation, which is the part of a page people skip. The copy is the
+        same copy those pages open with, edited in /admin, so the promise made
+        here and the page it leads to can never drift apart.
+      */}
+      <section className="bg-paper-100 py-20 md:py-28">
+        <div className="wrap">
+          <Reveal>
+            <p className="eyebrow text-azure">{ui.home.moreLabel}</p>
+          </Reveal>
+
+          <div className="mt-8 grid gap-5 md:mt-10 md:grid-cols-2 md:gap-6">
+            {[
+              { href: "/about", copy: about, fallback: "About me" },
+              { href: "/blog", copy: blog, fallback: "Blog" },
+            ].map((card, i) => (
+              <Reveal key={card.href} delay={i * 90}>
+                <Link
+                  href={card.href}
+                  data-cursor={ui.home.keywordCta}
+                  className="group flex h-full flex-col justify-between rounded-[8px] border border-navy-line bg-white p-7 transition-all duration-500 hover:-translate-y-1 hover:border-azure hover:shadow-[0_28px_60px_-40px_rgba(22,54,95,0.55)] md:p-9"
+                >
+                  <div>
+                    {card.copy.eyebrow && (
+                      <p className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-navy-soft">
+                        {card.copy.eyebrow}
+                      </p>
+                    )}
+                    <h2 className="display mt-3 text-[28px] leading-[1.1] text-navy transition-colors duration-300 group-hover:text-azure md:text-[34px]">
+                      {card.copy.title || card.fallback}
+                    </h2>
+                    {card.copy.lead && (
+                      <p className="mt-4 max-w-md text-[14.5px] leading-[1.75] text-navy-soft">
+                        {card.copy.lead}
+                      </p>
+                    )}
+                  </div>
+
+                  <span className="mt-8 inline-flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-azure">
+                    {ui.home.keywordCta}
+                    <svg
+                      width="20"
+                      height="10"
+                      viewBox="0 0 20 10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="transition-transform duration-500 group-hover:translate-x-1.5"
+                    >
+                      <path d="M1 5h17M14 1l4 4-4 4" />
+                    </svg>
+                  </span>
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ==================== KEYWORDS ==================== */}
       <section className="relative overflow-hidden bg-navy-deep py-24 md:py-32">
         <Orbs className="opacity-70" />
         <div className="wrap relative">

@@ -4,16 +4,23 @@ import Link from "next/link";
 import EntryList from "./EntryList";
 import Footer from "./Footer";
 import { Reveal, Words, Orbs, CountUp, Magnetic } from "./Motion";
-import { categoriesForKeyword } from "@/lib/settings";
+import { entriesForKeyword } from "@/lib/settings";
 import { useSite } from "./SiteProvider";
 
 export default function KeywordScreen({ settings, entries, keywordId }) {
   const { ui } = useSite();
   const keyword = settings.keywords.find((k) => k.id === keywordId);
-  const cats = categoriesForKeyword(settings, keywordId);
+  /* The activities on this page are now chosen per activity, not per section.
+     The sections are still how they are grouped on screen — a page is easier
+     to read under its familiar headings — but a section only appears if one of
+     its activities was chosen for this keyword. */
+  const chosen = entriesForKeyword(entries, settings, keywordId);
+  const cats = (settings.categories || []).filter((c) =>
+    chosen.some((e) => e.category === c.id)
+  );
   const others = settings.keywords.filter((k) => k.id !== keywordId);
 
-  const shown = entries.filter((e) => e.inPortfolio !== false);
+  const shown = chosen;
 
   const groups = cats.map((c) => ({
     id: c.id,
